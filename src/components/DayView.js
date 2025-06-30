@@ -16,36 +16,28 @@ export const getWeekNumber = (date) => {
   return weekNo;
 };
 
-const DayView = ({ day, dayNumber, activities, onToggle, onDayClick, isToday = false }) => (
-  <div className={`day-view ${isToday ? 'today' : ''}`} onClick={onDayClick}>
-    <h3>{day} <span className="day-number">{dayNumber}</span></h3>
-    <div className="activities-container">
-      {activities.map(activity => (
-        <Activity 
-          key={activity.id} 
-          activity={activity} 
-          onToggle={onToggle} 
-        >
-          <li>
-            <input 
-              type="checkbox" 
-              checked={activity.completado} 
-              onChange={() => onToggle(activity.id)} 
-            />
-            <div className="activity-content">
-              <div className="activity-top">
-                {activity.icono && <span className="activity-icon" style={{ fontSize: '1.5em', marginRight: '8px' }}>{activity.icono}</span>}
-                <span className="tag">{activity.tipo}</span>
-              </div>
-              <span className={activity.completado ? 'completed' : ''}>
-                {activity.actividad}
-              </span>
-            </div>
-          </li>
-        </Activity>
-      ))}
+const DayView = ({ day, dayNumber, activities, onToggle, onDayClick, isToday = false }) => {
+  const handleDayClick = (e) => {
+    // Only trigger day click if the click is on the day header or empty space
+    if (e.target.closest('.day-view > h3') || e.target === e.currentTarget) {
+      onDayClick();
+    }
+  };
+
+  return (
+    <div className={`day-view ${isToday ? 'today' : ''}`} onClick={handleDayClick}>
+      <h3>{day} <span className="day-number">{dayNumber}</span></h3>
+      <div className="activities-container" onClick={(e) => e.stopPropagation()}>
+        {activities.map(activity => (
+          <Activity 
+            key={activity.id} 
+            activity={activity} 
+            onToggle={onToggle} 
+          />
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export default DayView;
