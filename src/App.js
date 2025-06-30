@@ -5,13 +5,17 @@ import DayView from './components/DayView';
 import DayDetailModal from './components/DayDetailModal'; 
 import { defaultActivities } from './data/defaultActivities';
 import ProgressBar from './components/ProgressBar';
+import { format, startOfWeek, addDays, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 export default function App() {
   const [currentWeek, setCurrentWeek] = useState(() => {
+    // Get current date
     const today = new Date();
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1));
-    return monday.toISOString().split('T')[0];
+    // Get the start of the current week (Monday)
+    const monday = startOfWeek(today, { weekStartsOn: 1 });
+    // Format as YYYY-MM-DD
+    return format(monday, 'yyyy-MM-dd');
   });
   
   const [weeksData, setWeeksData] = useLocalStorage('studyPlannerData', {});
@@ -49,9 +53,9 @@ export default function App() {
   };
   
   const navigateWeek = (direction) => {
-    const date = new Date(currentWeek);
-    date.setDate(date.getDate() + (direction === 'next' ? 7 : -7));
-    setCurrentWeek(date.toISOString().split('T')[0]);
+    const currentMonday = parseISO(currentWeek);
+    const newMonday = addDays(currentMonday, direction === 'next' ? 7 : -7);
+    setCurrentWeek(format(newMonday, 'yyyy-MM-dd'));
   };
   
   // Calculate progress
@@ -77,6 +81,34 @@ export default function App() {
   }, {});
   
   const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+  
+  // Function to get day number from day name and current week
+  const getDayNumber = (dayName) => {
+    const dayIndex = days.indexOf(dayName);
+    if (dayIndex === -1) return '';
+    
+    const weekStart = parseISO(currentWeek);
+    const dayDate = addDays(weekStart, dayIndex);
+    return format(dayDate, 'd');
+  };
+  
+  // Get today's date
+  const today = new Date();
+  const todayFormatted = format(today, 'yyyy-MM-dd');
+  const todayDayName = days[today.getDay() === 0 ? 6 : today.getDay() - 1]; // Convert JS day to our day index
+  
+  // Function to check if a day is today
+  const isCurrentDay = (dayName) => {
+    // Get the date for the current week's Monday
+    const weekStart = parseISO(currentWeek);
+    const dayIndex = days.indexOf(dayName);
+    const dayDate = addDays(weekStart, dayIndex);
+    
+    // Format the day's date as YYYY-MM-DD
+    const dayFormatted = format(dayDate, 'yyyy-MM-dd');
+    
+    return dayFormatted === todayFormatted;
+  };
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
@@ -137,9 +169,11 @@ export default function App() {
             <DayView 
               key={day} 
               day={day} 
+              dayNumber={getDayNumber(day)}
               activities={activitiesByDay[day]} 
               onToggle={handleToggleActivity} 
-              onDayClick={() => handleDayClick(day)} 
+              onDayClick={() => handleDayClick(day)}
+              isToday={isCurrentDay(day)}
             />
           )
         ))}

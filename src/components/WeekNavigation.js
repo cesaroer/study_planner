@@ -1,22 +1,21 @@
 import React from 'react';
+import { format, startOfWeek, addDays, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { getWeekNumber } from './DayView';
 
 const getWeekRange = (date) => {
-  const start = new Date(date);
-  start.setDate(date.getDate() - date.getDay() + (date.getDay() === 0 ? -6 : 1)); // Monday
-  const end = new Date(start);
-  end.setDate(start.getDate() + 6); // Sunday
+  const start = startOfWeek(parseISO(date), { weekStartsOn: 1 });
+  const end = addDays(start, 6); // Sunday
   return { start, end };
 };
 
 const formatDate = (date) => {
-  return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+  return format(date, 'd MMM', { locale: es });
 };
 
 const WeekNavigation = ({ onPrev, onNext, currentWeek }) => {
-  const date = new Date(currentWeek);
-  const weekNumber = getWeekNumber(date);
-  const { start, end } = getWeekRange(date);
+  const weekNumber = getWeekNumber(parseISO(currentWeek));
+  const { start, end } = getWeekRange(currentWeek);
   const weekRangeString = `${formatDate(start)} - ${formatDate(end)}`;
 
   return (

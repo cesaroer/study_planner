@@ -153,6 +153,25 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1); /* Subtle glass border */
 }
 
+.day-view.today {
+  position: relative;
+  z-index: 1;
+  border: 1px solid rgba(255, 165, 0, 0.5); /* More subtle orange border */
+  background: linear-gradient(135deg, rgba(255, 165, 0, 0.05) 0%, rgba(255, 165, 0, 0.02) 100%); /* Very subtle gradient */
+}
+
+.day-view.today::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 16px;
+  box-shadow: 0 0 8px rgba(255, 165, 0, 0.2); /* Very subtle glow */
+  pointer-events: none;
+}
+
 .day-view:hover {
   transform: translateY(-3px); /* More pronounced lift */
   box-shadow: 0 10px 28px rgba(0,0,0,0.6); /* Stronger shadow on hover */
@@ -165,6 +184,19 @@ body {
   border-bottom: 1px solid rgba(255, 255, 255, 0.15); /* Subtle separator */
   color: #E0E0E0; /* Consistent text color */
   font-size: 1.1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.day-view .day-number {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 8px;
+  font-weight: normal;
 }
 
 .day-view ul {
@@ -406,8 +438,19 @@ body {
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
 }
 
-.modal-activity-tile.completed .modal-activity-content {
-  filter: blur(2px) grayscale(50%); /* Blur and desaturate when completed */
+.modal-activity-tile.completed {
+  filter: grayscale(30%); /* Only slight desaturation */
+  opacity: 0.8; /* Make it slightly transparent */
+  /* Keep pointer events enabled for the checkmark */
+}
+
+/* Fix for the checkmark overlay to be clickable */
+.modal-checkmark-overlay {
+  pointer-events: none; /* Allow clicks to pass through to the parent */
+}
+
+.modal-checkmark-overlay > span {
+  pointer-events: auto; /* Make the emoji clickable */
 }
 
 .modal-activity-tile.completed .modal-checkmark-overlay {

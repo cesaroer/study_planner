@@ -7,14 +7,14 @@ const ModalActivity = ({ activity, onToggle }) => {
   };
 
   return (
-    <div className={`modal-activity-tile ${activity.completado ? 'completed' : ''}`} onClick={handleClick}>
-      <div className="modal-activity-content">
+    <div className={`modal-activity-tile ${activity.completado ? 'completed' : ''}`}>
+      <div className="modal-activity-content" onClick={handleClick}>
         {activity.icono && <span className="modal-activity-icon">{activity.icono}</span>}
         <h4 className="modal-activity-title">{activity.actividad}</h4>
         <span className="modal-activity-tag">{activity.tipo}</span>
       </div>
       {activity.completado && (
-        <div className="modal-checkmark-overlay">
+        <div className="modal-checkmark-overlay" onClick={handleClick}>
           <span role="img" aria-label="completed">✅</span>
         </div>
       )}
