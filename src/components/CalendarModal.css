@@ -1,0 +1,132 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(5px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.calendar-modal {
+  background: rgba(30, 30, 30, 0.6); /* match glassy card background */
+  color: #E0E0E0;
+  border-radius: 16px;
+  width: 98%; 
+  max-width: 1300px; 
+  max-height: 98vh; 
+  overflow: auto;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 24px;
+  background: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.view-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.view-button {
+  background: rgba(37, 117, 252, 0.2);
+  color: #E0E0E0;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.view-button:hover {
+  background: rgba(37, 117, 252, 0.4);
+}
+
+.view-button.active {
+  background: #2575FC;
+  color: white;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  color: #E0E0E0;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 22px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.close-button:hover {
+  color: #2575FC;
+}
+
+.calendar-container {
+  padding: 15px; /* Reduced padding */
+}
+
+/* Adjust font size for weekday labels */
+.react-calendar-heatmap .weekday-labels text {
+  font-size: 0.75em; /* Make weekday labels smaller */
+}
+
+.calendar-placeholder {
+  min-height: 500px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #f8f8f8;
+  border-radius: 8px;
+  color: #666;
+}
+
+/* Heatmap color scale (blue accent) */
+.color-empty { fill: rgba(255, 255, 255, 0.08); }
+.color-scale-0 { fill: rgba(37, 117, 252, 0.15); }
+.color-scale-1 { fill: rgba(37, 117, 252, 0.35); }
+.color-scale-2 { fill: rgba(37, 117, 252, 0.55); }
+.color-scale-3 { fill: rgba(37, 117, 252, 0.75); }
+.color-scale-4 { fill: #2575FC; }
+
+/* Tooltip styling */
+.react-tooltip {
+  background: #1a252f !important;
+  color: white !important;
+  border-radius: 4px !important;
+  padding: 10px 14px !important;
+  font-size: 16px !important;
+  border: 1px solid #34495e !important;
+}
+
+/* Tooltip arrow styling */
+.react-tooltip .place-top::before {
+  border-bottom-color: #1a252f !important;
+}
+
+.react-tooltip .place-bottom::before {
+  border-top-color: #1a252f !important;
+}
+
+.react-tooltip .place-left::before {
+  border-right-color: #1a252f !important;
+}
+
+.react-tooltip .place-right::before {
+  border-left-color: #1a252f !important;
+}

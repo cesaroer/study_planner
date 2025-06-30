@@ -7,6 +7,7 @@ import { defaultActivities } from './data/defaultActivities';
 import ProgressBar from './components/ProgressBar';
 import { format, startOfWeek, addDays, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import CalendarModal from './components/CalendarModal';
 
 export default function App() {
   const [currentWeek, setCurrentWeek] = useState(() => {
@@ -43,6 +44,7 @@ export default function App() {
   console.log("currentWeek:", currentWeek);
   console.log("currentWeekData:", currentWeekData);
 
+  // Ensure only one handleToggleActivity function is defined
   const handleToggleActivity = (id) => {
     setWeeksData(prev => ({
       ...prev,
@@ -113,6 +115,30 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
   const [notes, setNotes] = useState({}); // State to store notes for each day
+  const [completions, setCompletions] = useState({});
+
+  // Recalculate per-day completion counts whenever weeksData changes
+  useEffect(() => {
+    const newCompletions = {};
+    Object.entries(weeksData).forEach(([weekMonday, activities]) => {
+      if (!Array.isArray(activities)) return;
+      const weekStart = parseISO(weekMonday);
+      activities.forEach(act => {
+        const dayIdx = days.indexOf(act.dia);
+        if (dayIdx === -1) return;
+        const dateObj = addDays(weekStart, dayIdx);
+        const dateStr = format(dateObj, 'yyyy-MM-dd');
+        if (!newCompletions[dateStr]) {
+          newCompletions[dateStr] = { completed: 0, total: 0 };
+        }
+        newCompletions[dateStr].total += 1;
+        if (act.completado) {
+          newCompletions[dateStr].completed += 1;
+        }
+      });
+    });
+    setCompletions(newCompletions);
+  }, [weeksData]);
 
   const handleSaveNotes = (dayKey, newNotes) => {
     setNotes(prevNotes => ({ ...prevNotes, [dayKey]: newNotes }));
@@ -148,6 +174,27 @@ export default function App() {
     setSelectedDay(null);
   };
 
+  // New state for calendar modal
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+
+  const handleOpenCalendar = () => {
+    setIsCalendarModalOpen(true);
+  };
+
+  const handleCloseCalendar = () => {
+    setIsCalendarModalOpen(false);
+  };
+
+  const updateCompletions = (date, activityId, completed) => {
+    setCompletions(prev => {
+      const dateStr = date.toISOString().split('T')[0];
+      const newCompletions = { ...prev };
+      if (!newCompletions[dateStr]) newCompletions[dateStr] = {};
+      newCompletions[dateStr][activityId] = completed;
+      return newCompletions;
+    });
+  };
+
   return (
     <div className="app">
       <h1 className="app-title">Agenda de Estudio</h1>
@@ -156,6 +203,7 @@ export default function App() {
         onPrev={() => navigateWeek('prev')} 
         onNext={() => navigateWeek('next')} 
         currentWeek={currentWeek} 
+        onOpenCalendar={handleOpenCalendar}
       />
       
       <div className="progress-summary">
@@ -191,6 +239,12 @@ export default function App() {
           onUncheckAll={handleUncheckAll}
         />
       )}
+      
+      <CalendarModal 
+        isOpen={isCalendarModalOpen} 
+        onClose={handleCloseCalendar}
+        completions={completions}
+      />
     </div>
   );
 }
