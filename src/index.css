@@ -406,7 +406,7 @@ body {
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
 }
 
-.modal-activity-tile.completed {
+.modal-activity-tile.completed .modal-activity-content {
   filter: blur(2px) grayscale(50%); /* Blur and desaturate when completed */
 }
 
