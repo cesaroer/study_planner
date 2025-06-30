@@ -1,0 +1,522 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap');
+
+body {
+  font-family: 'Roboto', sans-serif;
+  margin: 0;
+  padding: 20px;
+  background-color: #121212; /* Softer dark */
+  color: #E0E0E0; /* Soft white text */
+}
+
+.app-title {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.app-title h1 {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 2.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.app {
+  margin: 0 auto;
+  max-width: 1200px; /* Defined width */
+  padding: 20px; /* Breathing room */
+}
+
+
+
+.week-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background: rgba(30, 30, 30, 0.6); /* Semi-transparent dark */
+  backdrop-filter: blur(10px); /* Glassy effect */
+  border-radius: 16px; /* Softer corners */
+  margin-bottom: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4); /* Enhanced shadow */
+  border: 1px solid rgba(255, 255, 255, 0.1); /* Subtle glass border */
+}
+
+.week-navigation button {
+  background: rgba(255, 255, 255, 0.1); /* Subtle transparent background */
+  color: #E0E0E0; /* Soft white text */
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.week-navigation button:hover {
+  background: rgba(255, 255, 255, 0.2); /* Slightly more opaque on hover */
+  transform: translateY(-1px); /* Subtle lift */
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3); /* Enhanced shadow on hover */
+}
+
+.week-navigation h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.week-title h2 {
+  font-size: 1.4rem;
+  font-weight: bold;
+  text-align: center;
+}
+
+.week-number {
+  color: #ffffff;
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 4px 8px;
+  border-radius: 8px;
+  margin-right: 5px;
+}
+
+.week-range {
+  color: #ffffff;
+  opacity: 0.9;
+}
+
+.progress-summary {
+  margin: 20px 0;
+  text-align: center;
+}
+
+.progress-container {
+  height: 24px;
+  background: rgba(30, 30, 30, 0.4); /* More transparent background */
+  backdrop-filter: blur(8px); /* Increased glassy effect */
+  border-radius: 12px;
+  margin: 10px 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1); /* Subtle border */
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3); /* Subtle shadow */
+  position: relative; /* Needed for absolute positioning of rocket */
+}
+
+.rocket-emoji {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.2em;
+  transition: left 0.3s ease-out;
+  z-index: 1; /* Ensure it's above the progress bar */
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, rgba(37, 117, 252, 0.7), rgba(106, 17, 203, 0.7)); /* More subtle, transparent blue-purple gradient */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: width 0.3s ease;
+  border-radius: 12px; /* Ensure gradient fills rounded container */
+}
+
+.progress-text {
+  color: #E0E0E0; /* Lighter text for contrast */
+  font-weight: bold;
+  font-size: 14px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3); /* Add text shadow for readability */
+}
+
+.week-view {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px;
+  justify-content: center;
+}
+
+.day-view {
+  flex: 1 1 auto;
+  min-width: 120px;
+  border-radius: 16px; /* Consistent rounded corners */
+  padding: 15px;
+  background-color: rgba(26, 26, 26, 0.6); /* Semi-transparent dark */
+  backdrop-filter: blur(8px); /* Glassy effect */
+  box-shadow: 0 6px 18px rgba(0,0,0,0.5); /* Deeper shadow */
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.1); /* Subtle glass border */
+}
+
+.day-view:hover {
+  transform: translateY(-3px); /* More pronounced lift */
+  box-shadow: 0 10px 28px rgba(0,0,0,0.6); /* Stronger shadow on hover */
+}
+
+.day-view h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15); /* Subtle separator */
+  color: #E0E0E0; /* Consistent text color */
+  font-size: 1.1rem;
+}
+
+.day-view ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.day-view li {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08); /* Subtle separator */
+}
+
+.day-view li:last-child {
+  border-bottom: none;
+}
+
+.day-view input[type="checkbox"] {
+  margin-right: 10px;
+  accent-color: #2575FC; /* Blue accent color */
+  background: rgba(26, 26, 26, 0.8); /* Match card background with transparency */
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.25); /* Visible border */
+}
+
+.day-view span:first-of-type {
+  flex-grow: 1;
+  font-size: 0.9rem;
+}
+
+.day-view .tag {
+  background: rgba(37, 117, 252, 0.2); /* Blue tint, more transparent */
+  color: #2575FC; /* Blue text */
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  border-radius: 12px;
+  margin-left: 8px;
+  font-weight: 500;
+  border: 1px solid rgba(37, 117, 252, 0.4); /* Blue border, more transparent */
+}
+
+.day-view li span:last-child {
+  margin-left: 8px;
+  font-size: 1.2rem;
+}
+
+.day-view .completed {
+  text-decoration: line-through;
+  color: #707070; /* Softer completed text */
+}
+
+.activity {
+  display: flex;
+  align-items: center;
+  margin: 10px 0;
+  padding: 10px;
+  background-color: rgba(34, 34, 34, 0.6); /* Semi-transparent dark */
+  backdrop-filter: blur(6px); /* Glassy effect */
+  border-radius: 12px; /* Softer corners */
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3); /* Subtle shadow */
+  border: 1px solid rgba(255, 255, 255, 0.12); /* Subtle glass border */
+}
+
+.activity input[type="checkbox"] {
+  margin-right: 10px;
+  width: 20px; /* Make checkbox larger */
+  height: 20px; /* Make checkbox larger */
+}
+
+.activity-text {
+  flex-grow: 1;
+}
+
+.activity-text.completed {
+  text-decoration: line-through;
+  color: #707070; /* Consistent completed text */
+}
+
+.activity-type {
+  background: rgba(37, 117, 252, 0.2); /* Blue tint, more transparent */
+  color: #2575FC; /* Blue text */
+  font-size: 0.70rem;
+  padding: 3px 10px;
+  border-radius: 12px;
+  margin-left: 8px;
+  font-weight: 500;
+  border: 1px solid rgba(37, 117, 252, 0.4); /* Blue border, more transparent */
+}
+
+.activity-content {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.activity-meta {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 4px;
+}
+
+.activity-meta .date {
+  font-size: 12px;
+  color: #666;
+}
+
+.activity-meta .priority {
+  font-size: 12px;
+  color: #666;
+}
+
+.activity-description {
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.activity-content {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.activity-meta {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 4px;
+}
+
+.activity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.activity-icon {
+  margin-right: 5px;
+  font-size: 18px;
+  color: #666;
+}
+
+.activity-info {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.activity-info .activity-type {
+  margin-left: 0;
+  margin-top: 5px;
+  align-self: flex-start;
+}
+
+/* DayDetailModal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7); /* Darker, semi-transparent background for blur effect */
+  backdrop-filter: blur(8px); /* Blur the background */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: rgba(30, 30, 30, 0.7); /* Glassy background */
+  backdrop-filter: blur(12px); /* Stronger blur for the modal itself */
+  border-radius: 20px;
+  padding: 30px;
+  width: 90%;
+  max-width: 600px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.15); /* Subtle border for glass effect */
+  color: #E0E0E0;
+}
+
+.modal-close-button {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: none;
+  border: none;
+  font-size: 1.8rem;
+  color: #E0E0E0;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.modal-close-button:hover {
+  color: #2575FC;
+}
+
+.modal-content h2 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: #2575FC; /* Blue accent for title */
+}
+
+.modal-activities-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); /* Responsive grid */
+  gap: 15px;
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+  padding-right: 10px; /* For scrollbar */
+}
+
+.modal-activity-tile {
+  background: rgba(40, 40, 40, 0.7); /* Slightly darker glassy for activities */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
+  position: relative; /* For overlay positioning */
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.modal-activity-tile:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+}
+
+.modal-activity-tile.completed {
+  filter: blur(2px) grayscale(50%); /* Blur and desaturate when completed */
+}
+
+.modal-activity-tile.completed .modal-checkmark-overlay {
+  opacity: 1;
+  backdrop-filter: blur(0px); /* Remove blur from overlay itself */
+}
+
+.modal-checkmark-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5); /* Semi-transparent dark overlay */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 3em;
+  opacity: 0; /* Hidden by default */
+  transition: opacity 0.3s ease;
+  z-index: 2; /* Above the activity content */
+  backdrop-filter: blur(5px); /* Apply blur to the overlay */
+}
+
+.modal-activity-icon {
+  font-size: 2.5em;
+  margin-bottom: 5px;
+}
+
+.modal-activity-title {
+  font-size: 1em;
+  font-weight: bold;
+  margin-bottom: 5px;
+  color: #E0E0E0;
+}
+
+.modal-activity-tag {
+  font-size: 0.8em;
+  color: #A0A0A0;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 3px 8px;
+  border-radius: 8px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.modal-action-button {
+  background: rgba(37, 117, 252, 0.2); /* Light blue transparent */
+  color: #2575FC;
+  border: 1px solid #2575FC;
+  padding: 8px 15px;
+  border-radius: 15px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(5px); /* Glassy effect */
+}
+
+.modal-action-button:hover {
+  background: rgba(37, 117, 252, 0.4); /* Darker on hover */
+  box-shadow: 0 2px 8px rgba(37, 117, 252, 0.3);
+}
+
+.modal-activities-container .activity {
+  background: rgba(40, 40, 40, 0.7); /* Slightly darker glassy for activities */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 10px;
+}
+
+.modal-notes-textarea {
+  width: calc(100% - 20px); /* Adjust for padding */
+  min-height: 100px;
+  background: rgba(40, 40, 40, 0.7); /* Glassy background for textarea */
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 10px;
+  color: #E0E0E0;
+  font-family: 'Roboto', sans-serif;
+  font-size: 1rem;
+  resize: vertical;
+  margin-bottom: 20px;
+}
+
+.modal-notes-textarea::placeholder {
+  color: #A0A0A0;
+}
+
+.modal-save-button {
+  background: linear-gradient(135deg, #2575FC, #6a11cb); /* Blue-purple gradient */
+  color: white;
+  border: none;
+  padding: 12px 25px;
+  border-radius: 25px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  display: block;
+  margin: 0 auto;
+}
+
+.modal-save-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
