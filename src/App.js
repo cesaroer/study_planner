@@ -181,6 +181,41 @@ export default function App() {
     });
   };
 
+  // Calculate completions for calendar heatmap
+  useEffect(() => {
+    const newCompletions = {};
+    
+    // Iterate over each week
+    Object.keys(weeksData).forEach(weekKey => {
+      const weekActivities = weeksData[weekKey];
+      
+      weekActivities.forEach(activity => {
+        if (activity.completado) {
+          // We need to know the actual date of the activity.
+          // Currently, we don't store the full date (YYYY-MM-DD) for each activity.
+          // We have 'semana' (the week start) and 'dia' (the day name).
+          // We can compute the date: weekKey (Monday) + index of the day in the week.
+          const weekStart = parseISO(weekKey);
+          const dayIndex = days.indexOf(activity.dia);
+          if (dayIndex === -1) return;
+          
+          const activityDate = startOfDay(addDays(weekStart, dayIndex + 1));
+          const dateStr = format(activityDate, 'yyyy-MM-dd');
+          
+          if (!newCompletions[dateStr]) newCompletions[dateStr] = { completed: 0, total: 0 };
+          newCompletions[dateStr].completed += 1;
+          // We are not counting the total per day because it's not needed for the heatmap.
+          // But the CalendarModal expects an object with { completed, total }.
+          // We can set total to 0, but note: the tooltip shows total.
+          // We don't have total per day, so we skip total.
+          // We'll set total to 0 for now.
+        }
+      });
+    });
+    
+    setCompletions(newCompletions);
+  }, [weeksData]);
+
   return (
     <div className="app">
       <h1 className="app-title">Agenda de Estudio</h1>
