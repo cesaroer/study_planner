@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaCalendarAlt } from 'react-icons/fa';
+import { FaCalendarAlt, FaChartBar } from 'react-icons/fa';
 import { format, startOfWeek, addDays, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getWeekNumber } from './DayView';
@@ -14,7 +14,7 @@ const formatDate = (date) => {
   return format(date, 'd MMM', { locale: es });
 };
 
-const WeekNavigation = ({ onPrev, onNext, currentWeek, onOpenCalendar }) => {
+const WeekNavigation = ({ onPrev, onNext, currentWeek, onOpenCalendar, onOpenFrequency }) => {
   const weekNumber = getWeekNumber(parseISO(currentWeek));
   const { start, end } = getWeekRange(currentWeek);
   const weekRangeString = `${formatDate(start)} - ${formatDate(end)}`;
@@ -30,13 +30,22 @@ const WeekNavigation = ({ onPrev, onNext, currentWeek, onOpenCalendar }) => {
         </h2>
       </div>
       <button onClick={onNext}>Semana siguiente →</button>
-      <button 
-        className="calendar-button" 
-        onClick={onOpenCalendar}
-        title="Ver calendario"
-      >
-        <FaCalendarAlt />
-      </button>
+      <div className="action-buttons">
+        <button 
+          className="calendar-button" 
+          onClick={onOpenCalendar}
+          title="Ver calendario"
+        >
+          <FaCalendarAlt />
+        </button>
+        <button 
+          className="frequency-button" 
+          onClick={onOpenFrequency}
+          title="Ver frecuencias"
+        >
+          <FaChartBar />
+        </button>
+      </div>
     </div>
   );
 };

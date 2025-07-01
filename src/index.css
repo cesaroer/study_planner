@@ -607,3 +607,12 @@ body {
   box-shadow: 0 0 12px rgba(26, 35, 126, 0.6);
   border-color: #283593; /* Azul ligeramente más claro al pasar el ratón */
 }
+
+/* Contenedor de botones de acción */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  background-color: #111010;
+  border-radius: 18px;
+  padding: 6px;
+}
