@@ -5,7 +5,7 @@ import DayView from './components/DayView';
 import DayDetailModal from './components/DayDetailModal'; 
 import { defaultActivities } from './data/defaultActivities';
 import ProgressBar from './components/ProgressBar';
-import { format, startOfWeek, addDays, parseISO } from 'date-fns';
+import { format, startOfWeek, addDays, parseISO, isBefore, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import CalendarModal from './components/CalendarModal';
 
@@ -95,7 +95,7 @@ export default function App() {
   };
   
   // Get today's date
-  const today = new Date();
+  const today = startOfDay(new Date());
   const todayFormatted = format(today, 'yyyy-MM-dd');
   const todayDayName = days[today.getDay() === 0 ? 6 : today.getDay() - 1]; // Convert JS day to our day index
   
@@ -212,19 +212,24 @@ export default function App() {
       </div>
       
       <div className="week-view">
-        {days.map(day => (
-          activitiesByDay[day] && (
-            <DayView 
-              key={day} 
-              day={day} 
-              dayNumber={getDayNumber(day)}
-              activities={activitiesByDay[day]} 
-              onToggle={handleToggleActivity} 
-              onDayClick={() => handleDayClick(day)}
-              isToday={isCurrentDay(day)}
-            />
-          )
-        ))}
+        {days.map((day, index) => {
+          const dayDate = addDays(parseISO(currentWeek), index);
+          const isPast = isBefore(startOfDay(dayDate), today);
+          return (
+            activitiesByDay[day] && (
+              <DayView 
+                key={day} 
+                day={day} 
+                dayNumber={getDayNumber(day)}
+                activities={activitiesByDay[day]} 
+                onToggle={handleToggleActivity} 
+                onDayClick={() => handleDayClick(day)}
+                isToday={isCurrentDay(day)}
+                isPast={isPast}
+              />
+            )
+          );
+        })}
       </div>
 
       {isModalOpen && selectedDay && (

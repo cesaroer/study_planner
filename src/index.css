@@ -592,3 +592,18 @@ body {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
 }
+
+/* Estilos para días pasados */
+.day-view.past-day {
+  opacity: 0.6;
+  border-radius: 8px;
+  border: 2px solid #1725ba; /* Borde azul oscuro */
+  box-shadow: 0 0 10px rgba(84, 95, 212, 0.4); /* Sombra azul más intensa */
+  transition: all 0.3s ease;
+}
+
+.day-view.past-day:hover {
+  opacity: 0.95;
+  box-shadow: 0 0 12px rgba(26, 35, 126, 0.6);
+  border-color: #283593; /* Azul ligeramente más claro al pasar el ratón */
+}

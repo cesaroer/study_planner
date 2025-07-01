@@ -16,7 +16,7 @@ export const getWeekNumber = (date) => {
   return weekNo;
 };
 
-const DayView = ({ day, dayNumber, activities, onToggle, onDayClick, isToday = false }) => {
+const DayView = ({ day, dayNumber, activities, onToggle, onDayClick, isToday = false, isPast = false }) => {
   const handleDayClick = (e) => {
     // Only trigger day click if the click is on the day header or empty space
     if (e.target.closest('.day-view > h3') || e.target === e.currentTarget) {
@@ -25,7 +25,10 @@ const DayView = ({ day, dayNumber, activities, onToggle, onDayClick, isToday = f
   };
 
   return (
-    <div className={`day-view ${isToday ? 'today' : ''}`} onClick={handleDayClick}>
+    <div 
+      className={`day-view ${isToday ? 'today' : ''} ${isPast ? 'past-day' : ''}`} 
+      onClick={handleDayClick}
+    >
       <h3>{day} <span className="day-number">{dayNumber}</span></h3>
       <div className="activities-container" onClick={(e) => e.stopPropagation()}>
         {activities.map(activity => (
