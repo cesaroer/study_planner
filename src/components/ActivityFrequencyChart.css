@@ -1,0 +1,54 @@
+.chart-container {
+  margin-top: 30px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(4px);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  color: white;
+  text-align: center;
+}
+
+.chart-container h3 {
+  margin-bottom: 20px;
+  font-size: 1.2rem;
+}
+
+.chart-bars {
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+  height: 150px;
+  gap: 10px;
+}
+
+.chart-bar-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  flex-grow: 1;
+}
+
+.chart-bar {
+  width: 30px;
+  background: linear-gradient(to top, #497add1f, #0b3cba);
+  border-radius: 5px 5px 0 0;
+  transition: height 0.3s ease;
+  box-shadow: 0 0 8px rgba(29, 42, 87, 0.5);
+}
+
+.bar-label {
+  margin-top: 5px;
+  font-size: 0.8rem;
+  word-break: break-word;
+  text-align: center;
+  max-width: 80px; /* Limit width to prevent overflow */
+}
+
+.no-data-message {
+  color: rgba(255, 255, 255, 0.7);
+  font-style: italic;
+}
