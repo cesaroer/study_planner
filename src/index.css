@@ -616,3 +616,154 @@ body {
   border-radius: 18px;
   padding: 6px;
 }
+
+/* Estilos para login */
+.login-bg {
+  min-height: 100vh;
+  background: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-card {
+  background: #18191c;
+  border-radius: 18px;
+  box-shadow: 0 8px 32px 0 rgba(0,0,0,0.45);
+  padding: 38px 32px 32px 32px;
+  width: 100%;
+  max-width: 350px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.login-logo {
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-circle {
+  width: 44px;
+  height: 44px;
+  background: #23272f;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.1rem;
+  color: #3b82f6;
+  box-shadow: 0 2px 8px 0 rgba(59,130,246,0.12);
+}
+
+.login-title {
+  color: #fff;
+  font-size: 1.45rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  letter-spacing: 0.01em;
+}
+
+.login-sub {
+  color: #bdbdbd;
+  font-size: 0.97rem;
+  margin-bottom: 18px;
+}
+
+.login-link {
+  color: #3b82f6;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.login-error {
+  color: #f87171;
+  background: #231818;
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  font-size: 0.98rem;
+  width: 100%;
+  text-align: center;
+}
+
+.login-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.login-field {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  background: #23272f;
+  border-radius: 8px;
+  padding: 2px 8px;
+  border: 1.5px solid #23272f;
+  transition: border 0.2s;
+}
+
+.login-field:focus-within {
+  border: 1.5px solid #3b82f6;
+}
+
+.login-field input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #eaeaea;
+  font-size: 1rem;
+  padding: 12px 0 12px 2px;
+}
+
+.login-btn {
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 0;
+  font-size: 1.09rem;
+  font-weight: 600;
+  margin-top: 10px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px 0 rgba(59,130,246,0.10);
+  transition: background 0.2s;
+}
+
+.login-btn:hover {
+  background: #2563eb;
+}
+
+/* User Bar (keep as is) */
+.user-bar {
+  background: #181818;
+  color: #eee;
+  padding: 12px 18px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.user-bar button {
+  background: #222;
+  color: #eee;
+  border: none;
+  border-radius: 5px;
+  padding: 6px 16px;
+  margin-left: 16px;
+  cursor: pointer;
+  font-size: 0.97rem;
+  transition: background 0.2s;
+}
+
+.user-bar button:hover {
+  background: #e11d48;
+  color: #fff;
+}
