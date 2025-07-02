@@ -9,6 +9,7 @@ import { format, startOfWeek, addDays, parseISO, isBefore, startOfDay } from 'da
 import { es } from 'date-fns/locale';
 import CalendarModal from './components/CalendarModal';
 import FrequencyModal from './components/FrequencyModal';
+import SettingsModal from './components/SettingsModal';
 import { encryptData, decryptData } from './auth/cryptoUtils';
 
 // Utilidad simple para generar UUID v4
@@ -257,6 +258,8 @@ export default function App() {
   const [notes, setNotes] = useState({}); 
   const [completions, setCompletions] = useState({});
   const [showFrequencyModal, setShowFrequencyModal] = useState(false);
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   const handleSaveNotes = (dayKey, newNotes) => {
     setNotes(prevNotes => ({ ...prevNotes, [dayKey]: newNotes }));
@@ -292,8 +295,6 @@ export default function App() {
     setSelectedDay(null);
   };
 
-  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
-
   const handleOpenCalendar = () => {
     setIsCalendarModalOpen(true);
   };
@@ -304,6 +305,14 @@ export default function App() {
 
   const handleOpenFrequency = () => {
     setShowFrequencyModal(true);
+  };
+
+  const handleOpenSettings = () => {
+    setShowSettingsModal(true);
+  };
+
+  const handleCloseSettings = () => {
+    setShowSettingsModal(false);
   };
 
   const updateCompletions = (date, activityId, completed) => {
@@ -409,6 +418,7 @@ export default function App() {
         currentWeek={currentWeek} 
         onOpenCalendar={handleOpenCalendar}
         onOpenFrequency={handleOpenFrequency}
+        onOpenSettings={handleOpenSettings}
       />
       
       <div className="progress-summary">
@@ -464,6 +474,12 @@ export default function App() {
           currentWeek={currentWeek}
         />
       )}
+      
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={handleCloseSettings}
+        onLogout={handleLogout}
+      />
     </div>
   );
 }

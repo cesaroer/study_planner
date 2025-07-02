@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaCalendarAlt, FaChartBar } from 'react-icons/fa';
+import { FaCalendarAlt, FaChartBar, FaCog } from 'react-icons/fa';
 import { format, startOfWeek, addDays, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getWeekNumber } from './DayView';
@@ -14,7 +14,7 @@ const formatDate = (date) => {
   return format(date, 'd MMM', { locale: es });
 };
 
-const WeekNavigation = ({ onPrev, onNext, currentWeek, onOpenCalendar, onOpenFrequency }) => {
+const WeekNavigation = ({ onPrev, onNext, currentWeek, onOpenCalendar, onOpenFrequency, onOpenSettings }) => {
   const weekNumber = getWeekNumber(parseISO(currentWeek));
   const { start, end } = getWeekRange(currentWeek);
   const weekRangeString = `${formatDate(start)} - ${formatDate(end)}`;
@@ -44,6 +44,13 @@ const WeekNavigation = ({ onPrev, onNext, currentWeek, onOpenCalendar, onOpenFre
           title="Ver frecuencias"
         >
           <FaChartBar />
+        </button>
+        <button
+          className="settings-button"
+          onClick={onOpenSettings}
+          title="Ajustes"
+        >
+          <FaCog />
         </button>
       </div>
     </div>
