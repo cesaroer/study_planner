@@ -74,6 +74,268 @@
   padding: 20px 24px;
   max-height: 60vh;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Estilos para el formulario de agregar actividad */
+.settings-actions {
+  margin-bottom: 20px;
+}
+
+.add-activity-button {
+  background: rgba(37, 117, 252, 0.2);
+  color: #E0E0E0;
+  border: 1px solid rgba(37, 117, 252, 0.3);
+  border-radius: 8px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+}
+
+.add-activity-button:hover {
+  background: rgba(37, 117, 252, 0.3);
+  transform: translateY(-1px);
+}
+
+.add-activity-form {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.activity-input,
+.activity-select {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #E0E0E0;
+  font-size: 0.95rem;
+  width: 100%;
+}
+
+.activity-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.save-button,
+.cancel-button {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.save-button {
+  background: rgba(37, 117, 252, 0.2);
+  color: #E0E0E0;
+  border: 1px solid rgba(37, 117, 252, 0.3);
+}
+
+.save-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.save-button:not(:disabled):hover {
+  background: rgba(37, 117, 252, 0.3);
+}
+
+.cancel-button {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cancel-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Estilos para el selector de emojis */
+.icon-input-container {
+  position: relative;
+  z-index: 10;
+}
+
+.emoji-picker-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.emoji-picker-trigger:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.emoji-picker-container {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 10px;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.emoji-picker-container .emoji-picker-react {
+  background: rgba(30, 30, 40, 0.95) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.emoji-picker-container .emoji-search {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #E0E0E0 !important;
+  border-radius: 8px !important;
+  margin: 10px !important;
+  padding: 8px 12px !important;
+}
+
+.emoji-picker-container .emoji-categories {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.emoji-picker-container .emoji-scroll-wrapper::-webkit-scrollbar {
+  width: 6px;
+}
+
+.emoji-picker-container .emoji-scroll-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.emoji-icon {
+  color: #E0E0E0;
+  opacity: 0.8;
+  transition: all 0.2s;
+}
+
+.emoji-picker-trigger:hover .emoji-icon {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.icon-preview {
+  font-size: 1.8rem;
+  min-width: 40px;
+  text-align: center;
+}
+
+/* Estilos para el input de icono (ahora oculto) */
+.icon-input {
+  display: none;
+}
+
+/* Estilos para la selección de días */
+.days-selection {
+  margin: 15px 0;
+}
+
+.days-selection label {
+  display: block;
+  margin-bottom: 8px;
+  color: #E0E0E0;
+  font-size: 0.9rem;
+}
+
+.days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.day-button {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px 0;
+  color: #E0E0E0;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.day-button:hover {
+  background: rgba(37, 117, 252, 0.2);
+  border-color: rgba(37, 117, 252, 0.3);
+}
+
+.day-button.selected {
+  background: rgba(37, 117, 252, 0.3);
+  border-color: rgba(37, 117, 252, 0.5);
+  color: #fff;
+  font-weight: 500;
+}
+
+/* Estilos para el selector de emojis en dispositivos móviles */
+@media (max-width: 768px) {
+  .emoji-picker-container {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    margin: 0;
+    width: 100%;
+    border-radius: 16px 16px 0 0;
+    max-height: 60vh;
+  }
+  
+  .emoji-picker-container .emoji-picker-react {
+    height: 100% !important;
+    max-height: 60vh !important;
+  }
+}
+
+/* Estilos para los selects personalizados */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23E0E0E0%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+  padding-right: 30px;
 }
 
 /* Secciones de actividades */

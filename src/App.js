@@ -222,13 +222,21 @@ export default function App() {
 
   const progressText = `Progreso: ${completedCount}/${totalCount} actividades ${getProgressBarEmoji(progress)}`;
   
-  const activitiesByDay = currentWeekData.reduce((acc, activity) => {
+  const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+  
+  const activitiesByDay = (currentWeekData || []).reduce((acc, activity) => {
+    if (!activity || !activity.dia) return acc;
     if (!acc[activity.dia]) acc[activity.dia] = [];
     acc[activity.dia].push(activity);
     return acc;
   }, {});
   
-  const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+  // Ensure all days exist in the object, even if empty
+  days.forEach(day => {
+    if (!activitiesByDay[day]) {
+      activitiesByDay[day] = [];
+    }
+  });
   
   const getDayNumber = (dayName) => {
     const dayIndex = days.indexOf(dayName);
@@ -260,6 +268,7 @@ export default function App() {
   const [showFrequencyModal, setShowFrequencyModal] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [customActivities, setCustomActivities] = useState({});
 
   const handleSaveNotes = (dayKey, newNotes) => {
     setNotes(prevNotes => ({ ...prevNotes, [dayKey]: newNotes }));
@@ -311,6 +320,47 @@ export default function App() {
     setShowSettingsModal(true);
   };
 
+  const handleAddActivity = (newActivity, day) => {
+    setWeeksData(prevWeeksData => {
+      const newWeeksData = { ...prevWeeksData };
+      const weekKey = currentWeek; // Use the current week from state
+      
+      // Initialize the week if it doesn't exist
+      if (!newWeeksData[weekKey]) {
+        newWeeksData[weekKey] = [];
+      }
+      
+      // Add the new activity with the correct structure
+      const activityToAdd = {
+        ...newActivity,
+        semana: weekKey,
+        dia: day,
+        id: `${weekKey}-${day}-${newActivity.actividad}-${Date.now()}`
+      };
+      
+      // Check if activity with same ID already exists
+      const existingIndex = newWeeksData[weekKey].findIndex(
+        act => act.id === activityToAdd.id
+      );
+      
+      if (existingIndex >= 0) {
+        // Update existing activity
+        newWeeksData[weekKey][existingIndex] = activityToAdd;
+      } else {
+        // Add new activity
+        newWeeksData[weekKey] = [
+          ...(newWeeksData[weekKey] || []),
+          activityToAdd
+        ];
+      }
+      
+      // Save to localStorage
+      localStorage.setItem('weeksData', JSON.stringify(newWeeksData));
+      
+      return newWeeksData;
+    });
+  };
+
   const handleCloseSettings = () => {
     setShowSettingsModal(false);
   };
@@ -319,8 +369,19 @@ export default function App() {
     setCompletions(prev => {
       const dateStr = date.toISOString().split('T')[0];
       const newCompletions = { ...prev };
-      if (!newCompletions[dateStr]) newCompletions[dateStr] = {};
-      newCompletions[dateStr][activityId] = completed;
+      if (!newCompletions[dateStr]) {
+        newCompletions[dateStr] = { completed: 0, total: 0 };
+      }
+      // Update the count based on completion status
+      const activityDate = format(date, 'yyyy-MM-dd');
+      if (!newCompletions[activityDate]) {
+        newCompletions[activityDate] = { completed: 0, total: 0 };
+      }
+      if (completed) {
+        newCompletions[activityDate].completed += 1;
+      } else {
+        newCompletions[activityDate].completed = Math.max(0, newCompletions[activityDate].completed - 1);
+      }
       return newCompletions;
     });
   };
@@ -328,26 +389,44 @@ export default function App() {
   useEffect(() => {
     const newCompletions = {};
     
+    // First, count all activities by date
     Object.keys(weeksData).forEach(weekKey => {
       const weekActivities = weeksData[weekKey];
       
       weekActivities.forEach(activity => {
+        const weekStart = parseISO(weekKey);
+        const dayIndex = days.indexOf(activity.dia);
+        if (dayIndex === -1) return;
+        
+        // Sumar 1 al dayIndex para corregir el desplazamiento de fechas
+        const activityDate = startOfDay(addDays(weekStart, dayIndex + 1));
+        const dateStr = format(activityDate, 'yyyy-MM-dd');
+        
+        if (!newCompletions[dateStr]) {
+          newCompletions[dateStr] = { completed: 0, total: 0 };
+        }
+        
+        // Count all activities for the day
+        newCompletions[dateStr].total += 1;
+        
+        // Count completed activities
         if (activity.completado) {
-          const weekStart = parseISO(weekKey);
-          const dayIndex = days.indexOf(activity.dia);
-          if (dayIndex === -1) return;
-          
-          const activityDate = startOfDay(addDays(weekStart, dayIndex + 1));
-          const dateStr = format(activityDate, 'yyyy-MM-dd');
-          
-          if (!newCompletions[dateStr]) newCompletions[dateStr] = { completed: 0, total: 0 };
           newCompletions[dateStr].completed += 1;
         }
       });
     });
     
-    setCompletions(newCompletions);
-  }, [weeksData]);
+    setCompletions(prev => {
+      // Merge with existing completions to preserve any updates not in weeksData
+      const merged = { ...newCompletions };
+      Object.entries(prev).forEach(([date, data]) => {
+        if (!merged[date]) {
+          merged[date] = { ...data };
+        }
+      });
+      return merged;
+    });
+  }, [weeksData, days]);
 
   if (isAuthLoading) {
     return (
@@ -475,10 +554,12 @@ export default function App() {
         />
       )}
       
-      <SettingsModal
-        isOpen={showSettingsModal}
-        onClose={handleCloseSettings}
+      <SettingsModal 
+        isOpen={showSettingsModal} 
+        onClose={handleCloseSettings} 
         onLogout={handleLogout}
+        onAddActivity={handleAddActivity}
+        currentWeekActivities={currentWeekData}
       />
     </div>
   );
