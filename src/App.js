@@ -176,16 +176,29 @@ export default function App() {
 
 
   useEffect(() => {
-    if (!weeksData[currentWeek] || !Array.isArray(weeksData[currentWeek])) {
+    // Only initialize if the week doesn't exist or is empty
+    if (!weeksData[currentWeek] || weeksData[currentWeek].length === 0) {
       console.log(`Initializing week: ${currentWeek}`);
       const newWeekActivities = Object.entries(defaultActivities).flatMap(([day, acts]) =>
-        acts.map(act => ({ ...act, semana: currentWeek, dia: day, id: `${currentWeek}-${day}-${act.actividad}` }))
+        acts.map(act => ({
+          ...act,
+          semana: currentWeek,
+          dia: day,
+          id: `${currentWeek}-${day}-${act.actividad}-${Date.now()}`,
+          completado: false
+        }))
       );
       
-      setWeeksData(prev => ({
-        ...prev,
-        [currentWeek]: newWeekActivities,
-      }));
+      setWeeksData(prev => {
+        // Only set if it's still not initialized to avoid race conditions
+        if (!prev[currentWeek] || prev[currentWeek].length === 0) {
+          return {
+            ...prev,
+            [currentWeek]: newWeekActivities,
+          };
+        }
+        return prev;
+      });
     }
   }, [currentWeek, weeksData, setWeeksData]);
 
@@ -224,10 +237,28 @@ export default function App() {
   
   const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
   
-  const activitiesByDay = (currentWeekData || []).reduce((acc, activity) => {
-    if (!activity || !activity.dia) return acc;
-    if (!acc[activity.dia]) acc[activity.dia] = [];
-    acc[activity.dia].push(activity);
+  // Create a map to track unique activities by ID
+  const uniqueActivitiesMap = new Map();
+  
+  // Filter out duplicates by using the activity ID
+  const uniqueActivities = (currentWeekData || []).filter(activity => {
+    if (!activity || !activity.id || !activity.dia) return false;
+    
+    // If we've already seen this activity, skip it
+    if (uniqueActivitiesMap.has(activity.id)) {
+      return false;
+    }
+    
+    // Otherwise, add it to our map and include it
+    uniqueActivitiesMap.set(activity.id, true);
+    return true;
+  });
+  
+  // Group activities by day
+  const activitiesByDay = uniqueActivities.reduce((acc, activity) => {
+    const day = activity.dia;
+    if (!acc[day]) acc[day] = [];
+    acc[day].push(activity);
     return acc;
   }, {});
   
@@ -393,25 +424,40 @@ export default function App() {
     Object.keys(weeksData).forEach(weekKey => {
       const weekActivities = weeksData[weekKey];
       
+      // Skip if weekActivities is not an array or is empty
+      if (!Array.isArray(weekActivities) || weekActivities.length === 0) {
+        return;
+      }
+      
       weekActivities.forEach(activity => {
+        // Skip if activity is not an object or doesn't have required properties
+        if (!activity || typeof activity !== 'object' || !('dia' in activity) || !('completado' in activity)) {
+          console.warn('Invalid activity data:', activity);
+          return;
+        }
+        
         const weekStart = parseISO(weekKey);
         const dayIndex = days.indexOf(activity.dia);
         if (dayIndex === -1) return;
         
-        // Sumar 1 al dayIndex para corregir el desplazamiento de fechas
-        const activityDate = startOfDay(addDays(weekStart, dayIndex + 1));
-        const dateStr = format(activityDate, 'yyyy-MM-dd');
-        
-        if (!newCompletions[dateStr]) {
-          newCompletions[dateStr] = { completed: 0, total: 0 };
-        }
-        
-        // Count all activities for the day
-        newCompletions[dateStr].total += 1;
-        
-        // Count completed activities
-        if (activity.completado) {
-          newCompletions[dateStr].completed += 1;
+        try {
+          // Sumar 1 al dayIndex para corregir el desplazamiento de fechas
+          const activityDate = startOfDay(addDays(weekStart, dayIndex + 1));
+          const dateStr = format(activityDate, 'yyyy-MM-dd');
+          
+          if (!newCompletions[dateStr]) {
+            newCompletions[dateStr] = { completed: 0, total: 0 };
+          }
+          
+          // Count all activities for the day
+          newCompletions[dateStr].total += 1;
+          
+          // Count completed activities
+          if (activity.completado) {
+            newCompletions[dateStr].completed += 1;
+          }
+        } catch (error) {
+          console.error('Error processing activity:', error, 'Activity:', activity);
         }
       });
     });

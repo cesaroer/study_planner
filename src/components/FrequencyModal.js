@@ -16,17 +16,20 @@ const FrequencyCard = ({ title, activity, tipo }) => {
   );
 };
 
-export default function FrequencyModal({ isOpen, onClose, activities, currentWeek }) {
+export default function FrequencyModal({ isOpen, onClose, activities = [], currentWeek }) {
   if (!isOpen) return null;
 
-  // Filtrar actividades por semana actual
-  const currentWeekActivities = activities.filter(act => act.semana === currentWeek);
+  // Ensure activities is an array and filter by current week
+  const currentWeekActivities = Array.isArray(activities) 
+    ? activities.filter(act => act && act.semana === currentWeek)
+    : [];
+  
   console.log('currentWeekActivities:', currentWeekActivities);
 
   // Lógica para calcular las estadísticas
   const getMostFrequent = (tipo = null) => {
     // Filtrar actividades completadas de la semana actual
-    const completedActivities = currentWeekActivities.filter(act => act.completado);
+    const completedActivities = currentWeekActivities.filter(act => act && act.completado);
     console.log('completedActivities:', completedActivities);
     
     // Si no hay actividades completadas, retornar null
@@ -44,8 +47,10 @@ export default function FrequencyModal({ isOpen, onClose, activities, currentWee
     // Contar frecuencias
     const frequencyMap = {};
     filteredActivities.forEach(act => {
-      console.log(`Actividad: ${act.actividad}, Tipo: ${act.tipo}, Completada: ${act.completado}`);
-      frequencyMap[act.actividad] = (frequencyMap[act.actividad] || 0) + 1;
+      if (act && act.actividad) {
+        console.log(`Actividad: ${act.actividad}, Tipo: ${act.tipo}, Completada: ${act.completado}`);
+        frequencyMap[act.actividad] = (frequencyMap[act.actividad] || 0) + 1;
+      }
     });
     
     console.log(`FrequencyMap for ${tipo || 'all'}:`, frequencyMap);
@@ -72,12 +77,17 @@ export default function FrequencyModal({ isOpen, onClose, activities, currentWee
 
   // Calculate frequency data for the chart
   const chartData = (() => {
-    const completedActivities = currentWeekActivities.filter(act => act.completado);
+    const completedActivities = currentWeekActivities.filter(act => act && act.completado);
     const frequencyMap = {};
     completedActivities.forEach(act => {
-      frequencyMap[act.actividad] = (frequencyMap[act.actividad] || 0) + 1;
+      if (act && act.actividad) {
+        frequencyMap[act.actividad] = (frequencyMap[act.actividad] || 0) + 1;
+      }
     });
-    return Object.entries(frequencyMap).map(([activity, count]) => ({ activity, count })).sort((a, b) => b.count - a.count);
+    return Object.entries(frequencyMap).map(([activity, count]) => ({ 
+      activity, 
+      count 
+    })).sort((a, b) => b.count - a.count);
   })();
 
   return (
