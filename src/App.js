@@ -20,6 +20,20 @@ function generateUUID() {
   });
 }
 
+// Función para limpiar actividades duplicadas
+const cleanDuplicatedActivities = (activities) => {
+  if (!Array.isArray(activities)) return [];
+  
+  const uniqueIds = new Set();
+  return activities.filter(activity => {
+    if (!activity || !activity.id) return false;
+    if (uniqueIds.has(activity.id)) return false;
+    
+    uniqueIds.add(activity.id);
+    return true;
+  });
+};
+
 export default function App() {
   // ID único de dispositivo confiable
   const [deviceId] = useState(() => {
@@ -72,7 +86,26 @@ export default function App() {
     if (user && user.username) {
       const key = `studyPlannerData_${user.username}`;
       const stored = localStorage.getItem(key);
-      setWeeksData(stored ? JSON.parse(stored) : {});
+      
+      if (stored) {
+        try {
+          const parsedData = JSON.parse(stored);
+          // Limpiar datos duplicados al cargar
+          const cleanedData = {};
+          Object.entries(parsedData).forEach(([week, activities]) => {
+            cleanedData[week] = cleanDuplicatedActivities(activities);
+          });
+          
+          setWeeksData(cleanedData);
+          // Guardar datos limpios
+          localStorage.setItem(key, JSON.stringify(cleanedData));
+        } catch (e) {
+          console.error('Error al cargar datos del usuario:', e);
+          setWeeksData({});
+        }
+      } else {
+        setWeeksData({});
+      }
     } else {
       setWeeksData({});
     }
@@ -176,30 +209,50 @@ export default function App() {
 
 
   useEffect(() => {
-    // Only initialize if the week doesn't exist or is empty
-    if (!weeksData[currentWeek] || weeksData[currentWeek].length === 0) {
-      console.log(`Initializing week: ${currentWeek}`);
+    const initializeWeek = () => {
+      // Inicializar solo si la semana no existe o está vacía
+      if (weeksData[currentWeek] && weeksData[currentWeek].length > 0) return;
+      
+      console.log(`Inicializando semana: ${currentWeek}`);
+      
+      // Verificar si ya hay actividades para esta semana en localStorage
+      const storedWeekData = localStorage.getItem(`week_${currentWeek}`);
+      
+      if (storedWeekData) {
+        // Si hay datos guardados, usarlos
+        try {
+          const parsedData = JSON.parse(storedWeekData);
+          setWeeksData(prev => ({
+            ...prev,
+            [currentWeek]: parsedData
+          }));
+          return;
+        } catch (e) {
+          console.error('Error al cargar datos de la semana:', e);
+        }
+      }
+      
+      // Si no hay datos guardados, crear actividades por defecto
       const newWeekActivities = Object.entries(defaultActivities).flatMap(([day, acts]) =>
         acts.map(act => ({
           ...act,
           semana: currentWeek,
           dia: day,
-          id: `${currentWeek}-${day}-${act.actividad}-${Date.now()}`,
+          id: `${currentWeek}-${day}-${act.actividad}`.toLowerCase().replace(/\s+/g, '-'),
           completado: false
         }))
       );
       
-      setWeeksData(prev => {
-        // Only set if it's still not initialized to avoid race conditions
-        if (!prev[currentWeek] || prev[currentWeek].length === 0) {
-          return {
-            ...prev,
-            [currentWeek]: newWeekActivities,
-          };
-        }
-        return prev;
-      });
-    }
+      // Guardar en localStorage para futuras cargas
+      localStorage.setItem(`week_${currentWeek}`, JSON.stringify(newWeekActivities));
+      
+      setWeeksData(prev => ({
+        ...prev,
+        [currentWeek]: newWeekActivities
+      }));
+    };
+
+    initializeWeek();
   }, [currentWeek, weeksData, setWeeksData]);
 
   const currentWeekData = Array.isArray(weeksData[currentWeek]) ? weeksData[currentWeek] : [];
