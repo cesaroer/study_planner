@@ -58,6 +58,9 @@ export default function App() {
     return format(monday, 'yyyy-MM-dd');
   });
   
+  // Estado para la fecha seleccionada (inicialmente hoy)
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  
   // Hook para datos de usuario actual (clave depende del usuario)
   const [weeksData, setWeeksData] = useState({});
 
@@ -271,7 +274,15 @@ export default function App() {
   const navigateWeek = (direction) => {
     const currentMonday = parseISO(currentWeek);
     const newMonday = addDays(currentMonday, direction === 'next' ? 7 : -7);
-    setCurrentWeek(format(newMonday, 'yyyy-MM-dd'));
+    const newWeek = format(newMonday, 'yyyy-MM-dd');
+    setCurrentWeek(newWeek);
+    
+    // Si la fecha seleccionada no está en la nueva semana, seleccionar el primer día de la semana
+    const selectedWeek = startOfWeek(parseISO(newWeek), { weekStartsOn: 1 });
+    const selectedWeekEnd = addDays(selectedWeek, 6);
+    if (selectedDate < selectedWeek || selectedDate > selectedWeekEnd) {
+      setSelectedDate(selectedWeek);
+    }
   };
   
   const completedCount = currentWeekData.filter(a => a.completado).length;
@@ -597,6 +608,8 @@ export default function App() {
         onOpenCalendar={handleOpenCalendar}
         onOpenFrequency={handleOpenFrequency}
         onOpenSettings={handleOpenSettings}
+        onSelectDate={setSelectedDate}
+        selectedDate={selectedDate}
       />
       
       <div className="progress-summary">
@@ -608,19 +621,25 @@ export default function App() {
         {days.map((day, index) => {
           const dayDate = addDays(parseISO(currentWeek), index);
           const isPast = isBefore(startOfDay(dayDate), today);
+          const formattedDate = format(dayDate, 'yyyy-MM-dd');
+          const isSelected = format(selectedDate, 'yyyy-MM-dd') === formattedDate;
+          
           return (
-            activitiesByDay[day] && (
+            <div key={day} className={`day-container ${isSelected ? 'selected-day' : ''}`}>
               <DayView 
-                key={day} 
                 day={day} 
                 dayNumber={getDayNumber(day)}
-                activities={activitiesByDay[day]} 
+                activities={activitiesByDay[day] || []} 
                 onToggle={handleToggleActivity} 
-                onDayClick={() => handleDayClick(day)}
+                onDayClick={() => {
+                  setSelectedDate(dayDate);
+                  handleDayClick(day);
+                }}
                 isToday={isCurrentDay(day)}
                 isPast={isPast}
+                isSelected={isSelected}
               />
-            )
+            </div>
           );
         })}
       </div>
