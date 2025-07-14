@@ -92,40 +92,43 @@ export default function FrequencyModal({ isOpen, onClose, activities = [], curre
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="frequency-modal" onClick={e => e.stopPropagation()}>
-        <button className="modal-close-button" onClick={onClose}>×</button>
-        <h2>Estadísticas de Frecuencia</h2>
-        
-        <div className="frequency-stats">
-          <StatCard
-            emoji="🏆"
-            title="Actividad más frecuente"
-            value={mostFrequentOverall || 'N/A'}
-          />
-          <StatCard
-            emoji="⭐" title="Principal más frecuente"
-            value={mostFrequentPrimary || "N/A"}
-            
-          />
-          <StatCard
-            emoji="🔶" title="Secundaria más frecuente"
-            value={mostFrequentSecondary || "N/A"}
-            
-          />
-          <StatCard
-            emoji="🔷" title="Baja más frecuente"
-            value={mostFrequentLowPriority || "N/A"}
-            
-          />
-          <StatCard
-            emoji="⚪" title="Pasivo más frecuente"
-            value={mostFrequentPassive || "N/A"}
-            
-          />
+      <div className="frequency-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Estadísticas de Frecuencia</h2>
+          <button onClick={onClose} className="modal-close-button">
+            <FaTimes />
+          </button>
         </div>
-
-        <ActivityFrequencyChart data={chartData} />
-
+        <div className="modal-content">
+          <div className="frequency-stats">
+            <StatCard
+              emoji="🏆"
+              title="Actividad más frecuente"
+              value={mostFrequentOverall || 'N/A'}
+            />
+            <StatCard
+              emoji="⭐"
+              title="Principal más frecuente"
+              value={mostFrequentPrimary || "N/A"}
+            />
+            <StatCard
+              emoji="🔶"
+              title="Secundaria más frecuente"
+              value={mostFrequentSecondary || "N/A"}
+            />
+            <StatCard
+              emoji="🔷"
+              title="Baja más frecuente"
+              value={mostFrequentLowPriority || "N/A"}
+            />
+            <StatCard
+              emoji="⚪"
+              title="Pasivo más frecuente"
+              value={mostFrequentPassive || "N/A"}
+            />
+          </div>
+          <ActivityFrequencyChart data={chartData} />
+        </div>
       </div>
     </div>
   );
