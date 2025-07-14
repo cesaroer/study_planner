@@ -528,26 +528,26 @@ body {
   text-shadow: 0 1px 2px rgba(0,0,0,0.3); /* Add text shadow for readability */
 }
 
-/* Contenedor principal de la semana */
+/* --- Flexbox Layout para la Vista Semanal (Solución Definitiva) --- */
 .week-view {
   display: flex;
   flex-wrap: wrap;
-  gap: 0; /* Eliminamos el gap para controlar el espaciado manualmente */
-  padding: 0; /* Eliminamos el padding para que no haya espacios en los bordes */
-  width: 100%;
-  box-sizing: border-box;
+  margin: 0 -4px; /* Contrarresta el padding de los contenedores de día */
 }
 
-/* Contenedor de cada día */
 .day-container {
-  width: 25%; /* 4 columnas en la fila superior */
-  padding: 4px; /* Espaciado entre tarjetas */
   box-sizing: border-box;
+  padding: 4px; /* Espaciado entre tarjetas */
+  flex-grow: 0;   /* No permitir que los elementos crezcan */
+  flex-shrink: 0; /* No permitir que los elementos se encojan */
 }
 
-/* Para los últimos 3 días (los que van en la segunda fila) */
+/* Desktop: 4 + 3 grid */
+.day-container {
+  flex-basis: 25%; /* 4 columnas */
+}
 .day-container:nth-child(n+5) {
-  width: 33.333%; /* 3 columnas en la fila inferior */
+  flex-basis: 33.333%; /* 3 columnas para la segunda fila */
 }
 
 /* Estilo de la tarjeta de día */
@@ -569,38 +569,21 @@ body {
   overflow: hidden;
 }
 
-/* Ajustes para móviles */
-@media (max-width: 768px) {
-  .day-container {
-    width: 50%; /* 2 columnas en móviles */
-  }
-  
+/* ---- Responsive Design con Flexbox (Solución Definitiva) ---- */
+
+/* Tabletas (hasta 900px) */
+@media (max-width: 900px) {
+  .day-container,
   .day-container:nth-child(n+5) {
-    width: 50%; /* Mantener 2 columnas para la segunda fila en móviles */
-  }
-  
-  .day-view {
-    min-height: 120px;
-    padding: 10px;
+    flex-basis: 50%; /* 2 columnas */
   }
 }
 
-/* Ajustes para pantallas pequeñas */
-@media (max-width: 480px) {
-  .day-container {
-    width: 50%;
-    padding: 3px;
-  }
-  
-  .day-view {
-    min-height: 100px;
-    padding: 8px;
-    border-radius: 10px;
-  }
-  
-  .day-view h3 {
-    font-size: 0.9rem;
-    margin: 0 0 6px 0;
+/* Móviles (hasta 600px) */
+@media (max-width: 600px) {
+  .day-container,
+  .day-container:nth-child(n+5) {
+    flex-basis: 100%; /* 1 columna */
   }
 }
 
