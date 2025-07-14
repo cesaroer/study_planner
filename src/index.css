@@ -528,76 +528,149 @@ body {
   text-shadow: 0 1px 2px rgba(0,0,0,0.3); /* Add text shadow for readability */
 }
 
+/* Contenedor principal de la semana */
 .week-view {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 10px;
-  justify-content: center;
-}
-
-.day-view {
-  flex: 1 1 auto;
-  min-width: 120px;
-  border-radius: 16px; /* Consistent rounded corners */
-  padding: 15px;
-  background-color: rgba(26, 26, 26, 0.6); /* Semi-transparent dark */
-  backdrop-filter: blur(8px); /* Glassy effect */
-  box-shadow: 0 6px 18px rgba(0,0,0,0.5); /* Deeper shadow */
-  transition: transform 0.2s, box-shadow 0.2s;
+  gap: 0; /* Eliminamos el gap para controlar el espaciado manualmente */
+  padding: 0; /* Eliminamos el padding para que no haya espacios en los bordes */
+  width: 100%;
   box-sizing: border-box;
-  border: 1px solid rgba(255, 255, 255, 0.1); /* Subtle glass border */
 }
 
+/* Contenedor de cada día */
+.day-container {
+  width: 25%; /* 4 columnas en la fila superior */
+  padding: 4px; /* Espaciado entre tarjetas */
+  box-sizing: border-box;
+}
+
+/* Para los últimos 3 días (los que van en la segunda fila) */
+.day-container:nth-child(n+5) {
+  width: 33.333%; /* 3 columnas en la fila inferior */
+}
+
+/* Estilo de la tarjeta de día */
+.day-view {
+  width: 100%;
+  height: 100%;
+  min-height: 140px; /* Altura mínima para mantener consistencia */
+  border-radius: 12px;
+  padding: 12px;
+  background-color: rgba(26, 26, 26, 0.6);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Ajustes para móviles */
+@media (max-width: 768px) {
+  .day-container {
+    width: 50%; /* 2 columnas en móviles */
+  }
+  
+  .day-container:nth-child(n+5) {
+    width: 50%; /* Mantener 2 columnas para la segunda fila en móviles */
+  }
+  
+  .day-view {
+    min-height: 120px;
+    padding: 10px;
+  }
+}
+
+/* Ajustes para pantallas pequeñas */
+@media (max-width: 480px) {
+  .day-container {
+    width: 50%;
+    padding: 3px;
+  }
+  
+  .day-view {
+    min-height: 100px;
+    padding: 8px;
+    border-radius: 10px;
+  }
+  
+  .day-view h3 {
+    font-size: 0.9rem;
+    margin: 0 0 6px 0;
+  }
+}
+
+/* Estilos para el día actual */
 .day-view.today {
   position: relative;
   z-index: 1;
-  border: 1px solid rgba(255, 165, 0, 0.5); /* More subtle orange border */
-  background: linear-gradient(135deg, rgba(255, 165, 0, 0.05) 0%, rgba(255, 165, 0, 0.02) 100%); /* Very subtle gradient */
+  border: 1px solid rgba(255, 165, 0, 0.3);
+  background: linear-gradient(135deg, rgba(255, 165, 0, 0.08) 0%, rgba(255, 193, 7, 0.05) 100%);
+  box-shadow: 0 4px 15px rgba(255, 165, 0, 0.15);
 }
 
-.day-view.today::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  border-radius: 16px;
-  box-shadow: 0 0 8px rgba(255, 165, 0, 0.2); /* Very subtle glow */
-  pointer-events: none;
+.day-view.today h3 {
+  color: #FFA500;
+  font-weight: 600;
 }
 
+.day-view.today .day-number {
+  background: rgba(255, 165, 0, 0.2);
+  color: #FFA500;
+  border: 1px solid rgba(255, 165, 0, 0.3);
+}
+
+/* Estilos para el día seleccionado */
+.day-view.selected {
+  border: 1px solid rgba(106, 17, 203, 0.5);
+  background: linear-gradient(135deg, rgba(106, 17, 203, 0.15) 0%, rgba(37, 117, 252, 0.1) 100%);
+  box-shadow: 0 4px 15px rgba(106, 17, 203, 0.2);
+}
+
+.day-view.selected h3 {
+  color: #9147ff;
+  font-weight: 600;
+}
+
+/* Efecto hover para las tarjetas */
 .day-view:hover {
-  transform: translateY(-3px); /* More pronounced lift */
-  box-shadow: 0 10px 28px rgba(0,0,0,0.6); /* Stronger shadow on hover */
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
+/* Estilos para el encabezado de la tarjeta de día */
 .day-view h3 {
-  margin: 0 0 12px 0;
-  font-size: 1.1rem;
+  margin: 0 0 10px 0;
+  font-size: 1rem;
   color: #E0E0E0;
   display: flex;
   justify-content: space-between;
   align-items: center;
   position: relative;
   z-index: 1;
-}
-
-.day-view.selected h3 {
-  color: #fff;
-  font-weight: 500;
+  transition: color 0.2s ease;
 }
 
 .day-view .day-number {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.8rem;
-  padding: 2px 8px;
-  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+  border-radius: 6px; /* Rectángulo con esquinas redondeadas */
+  padding: 4px 8px; /* Ajuste de padding */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 500;
   margin-left: 8px;
-  font-weight: normal;
   transition: all 0.2s ease;
+  min-width: 26px; /* Ancho mínimo */
+  height: 26px; /* Altura fija */
+  box-sizing: border-box;
 }
 
 .day-view.selected .day-number {
