@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaCalendarAlt, FaChartBar, FaCog, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaCalendarAlt, FaChartBar, FaCog, FaChevronLeft, FaChevronRight, FaBook } from 'react-icons/fa';
 import { format, startOfWeek, addDays, parseISO, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getWeekNumber } from './DayView';
@@ -15,7 +15,7 @@ const formatDate = (date) => {
   return format(date, 'd MMM', { locale: es });
 };
 
-const WeekNavigation = ({ onPrev, onNext, currentWeek, onOpenCalendar, onOpenFrequency, onOpenSettings, onSelectDate, selectedDate }) => {
+const WeekNavigation = ({ onPrev, onNext, currentWeek, onOpenCalendar, onOpenFrequency, onOpenSettings, onOpenResources, onSelectDate, selectedDate }) => {
   const weekNumber = getWeekNumber(parseISO(currentWeek));
   const { start, end } = getWeekRange(currentWeek);
   const weekRangeString = `${formatDate(start)} - ${formatDate(end)}`;
@@ -52,6 +52,14 @@ const WeekNavigation = ({ onPrev, onNext, currentWeek, onOpenCalendar, onOpenFre
           aria-label="Ver calendario"
         >
           <FaCalendarAlt />
+        </button>
+        <button
+          className="icon-button"
+          onClick={onOpenResources}
+          title="Recursos"
+          aria-label="Recursos"
+        >
+          <FaBook />
         </button>
         <button
           className="icon-button"

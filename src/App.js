@@ -10,6 +10,7 @@ import { es } from 'date-fns/locale';
 import CalendarModal from './components/CalendarModal';
 import FrequencyModal from './components/FrequencyModal';
 import SettingsModal from './components/SettingsModal';
+import ResourcesModal from './components/ResourcesModal';
 import { encryptData, decryptData } from './auth/cryptoUtils';
 
 // Utilidad simple para generar UUID v4
@@ -363,6 +364,7 @@ export default function App() {
   const [showFrequencyModal, setShowFrequencyModal] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [isResourcesModalOpen, setIsResourcesModalOpen] = useState(false);
   const [customActivities, setCustomActivities] = useState({});
 
   const handleSaveNotes = (dayKey, newNotes) => {
@@ -456,9 +458,10 @@ export default function App() {
     });
   };
 
-  const handleCloseSettings = () => {
-    setShowSettingsModal(false);
-  };
+  const handleCloseSettings = () => setShowSettingsModal(false);
+
+  const handleOpenResources = () => setIsResourcesModalOpen(true);
+  const handleCloseResources = () => setIsResourcesModalOpen(false);
 
   const updateCompletions = (date, activityId, completed) => {
     setCompletions(prev => {
@@ -608,6 +611,7 @@ export default function App() {
         onOpenCalendar={handleOpenCalendar}
         onOpenFrequency={handleOpenFrequency}
         onOpenSettings={handleOpenSettings}
+        onOpenResources={handleOpenResources}
         onSelectDate={setSelectedDate}
         selectedDate={selectedDate}
       />
@@ -678,6 +682,13 @@ export default function App() {
         onLogout={handleLogout}
         onAddActivity={handleAddActivity}
         currentWeekActivities={currentWeekData}
+      />
+
+<ResourcesModal
+        isOpen={isResourcesModalOpen}
+        onClose={handleCloseResources}
+        activities={allActivities}
+        onAddActivity={handleAddActivity}
       />
     </div>
   );
