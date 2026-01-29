@@ -791,6 +791,21 @@ body {
   opacity: 0.6;
 }
 
+.activity.blocked {
+  opacity: 0.4;
+}
+
+.activity.blocked:hover {
+  background-color: rgba(34, 34, 34, 0.6);
+  transform: none;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.activity.blocked input[type="checkbox"] {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .activity:first-child {
   margin-top: 0;
 }

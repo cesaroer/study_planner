@@ -19,8 +19,10 @@ const groupActivitiesByType = (activities) => {
         actividad: activity.actividad,
         tipo: activity.tipo,
         icono: activity.icono || '📱',
+        bloqueada: false,
         dias: new Set(),
-        idsByDay: {}
+        idsByDay: {},
+        blockedByDay: {}
       });
     }
     const group = groupMap.get(uniqueKey);
@@ -29,6 +31,9 @@ const groupActivitiesByType = (activities) => {
       if (activity.id) {
         group.idsByDay[activity.dia] = activity.id;
       }
+      const isBlocked = Boolean(activity.bloqueada);
+      group.blockedByDay[activity.dia] = isBlocked;
+      if (isBlocked) group.bloqueada = true;
     }
   });
 
@@ -126,6 +131,14 @@ export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity
     }));
     setEditEmojiPickerId(null);
   };
+
+  const handleEditBlockedToggle = (e) => {
+    const checked = e.target.checked;
+    setEditingActivity(prev => ({
+      ...prev,
+      bloqueada: checked
+    }));
+  };
   
   const handleAddNewActivity = (e) => {
     e.preventDefault();
@@ -178,7 +191,8 @@ export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity
       tipo: activity.tipo || 'Algoritmos',
       icono: activity.icono || '📱',
       dias: Array.isArray(activity.dias) ? activity.dias : [],
-      idsByDay: activity.idsByDay || {}
+      idsByDay: activity.idsByDay || {},
+      bloqueada: Boolean(activity.bloqueada)
     });
   };
 
@@ -196,7 +210,8 @@ export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity
     const updates = {
       actividad: editingActivity.actividad.trim(),
       tipo: editingActivity.tipo,
-      icono: editingActivity.icono
+      icono: editingActivity.icono,
+      bloqueada: Boolean(editingActivity.bloqueada)
     };
 
     const existingByDay = editingActivity.idsByDay || {};
@@ -426,6 +441,14 @@ export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity
                               ))}
                             </div>
                           </div>
+                          <label className="block-toggle">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(editingActivity?.bloqueada)}
+                              onChange={handleEditBlockedToggle}
+                            />
+                            <span>Bloquear (no cuenta)</span>
+                          </label>
                           <div className="icon-input-container" ref={editEmojiPickerRef}>
                             <div
                               className="emoji-picker-trigger"

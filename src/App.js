@@ -267,7 +267,9 @@ export default function App() {
     setWeeksData(prev => ({
       ...prev,
       [currentWeek]: prev[currentWeek].map(act =>
-        act.id === id ? { ...act, completado: !act.completado } : act
+        act.id === id
+          ? (act.bloqueada ? act : { ...act, completado: !act.completado })
+          : act
       ),
     }));
   };
@@ -289,8 +291,8 @@ export default function App() {
     setSelectedDate(newSelectedDate);
   };
   
-  const completedCount = currentWeekData.filter(a => a.completado).length;
-  const totalCount = currentWeekData.length;
+  const completedCount = currentWeekData.filter(a => a && !a.bloqueada && a.completado).length;
+  const totalCount = currentWeekData.filter(a => a && !a.bloqueada).length;
   const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   const getProgressBarEmoji = (percentage) => {
@@ -344,6 +346,9 @@ export default function App() {
 
   Object.keys(activitiesByDay).forEach(day => {
     activitiesByDay[day] = (activitiesByDay[day] || []).slice().sort((a, b) => {
+      const ba = Boolean(a?.bloqueada);
+      const bb = Boolean(b?.bloqueada);
+      if (ba !== bb) return ba ? 1 : -1; // bloqueadas siempre al final
       const pa = TYPE_PRIORITY[a?.tipo] ?? 999;
       const pb = TYPE_PRIORITY[b?.tipo] ?? 999;
       if (pa !== pb) return pa - pb;
@@ -402,7 +407,7 @@ export default function App() {
     setWeeksData(prevWeeksData => {
       const newWeeksData = { ...prevWeeksData };
       newWeeksData[currentWeek] = newWeeksData[currentWeek].map(activity =>
-        activity.dia === dayKey ? { ...activity, completado: true } : activity
+        activity.dia === dayKey && !activity.bloqueada ? { ...activity, completado: true } : activity
       );
       return newWeeksData;
     });
@@ -412,7 +417,7 @@ export default function App() {
     setWeeksData(prevWeeksData => {
       const newWeeksData = { ...prevWeeksData };
       newWeeksData[currentWeek] = newWeeksData[currentWeek].map(activity =>
-        activity.dia === dayKey ? { ...activity, completado: false } : activity
+        activity.dia === dayKey && !activity.bloqueada ? { ...activity, completado: false } : activity
       );
       return newWeeksData;
     });
@@ -561,6 +566,11 @@ export default function App() {
         // Skip if activity is not an object or doesn't have required properties
         if (!activity || typeof activity !== 'object' || !('dia' in activity) || !('completado' in activity)) {
           console.warn('Invalid activity data:', activity);
+          return;
+        }
+
+        // Las actividades bloqueadas no cuentan para el calendario/progreso diario
+        if (activity.bloqueada) {
           return;
         }
         

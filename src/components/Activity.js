@@ -1,7 +1,10 @@
 import React from 'react';
 
 const Activity = ({ activity, onToggle }) => {
+  const isBlocked = Boolean(activity?.bloqueada);
+
   const handleContainerClick = (e) => {
+    if (isBlocked) return;
     // Only toggle if the click is not on the checkbox or its label
     if (!e.target.matches('input[type="checkbox"]')) {
       onToggle(activity.id);
@@ -9,13 +12,14 @@ const Activity = ({ activity, onToggle }) => {
   };
 
   const handleCheckboxChange = (e) => {
+    if (isBlocked) return;
     e.stopPropagation();
     onToggle(activity.id);
   };
 
   return (
     <div 
-      className="activity" 
+      className={`activity ${isBlocked ? 'blocked' : ''}`} 
       onClick={handleContainerClick}
       role="button"
       tabIndex={0}
@@ -25,9 +29,14 @@ const Activity = ({ activity, onToggle }) => {
         <input 
           type="checkbox"
           checked={activity.completado}
+          disabled={isBlocked}
           onChange={handleCheckboxChange}
           onClick={(e) => e.stopPropagation()}
-          aria-label={`Marcar "${activity.actividad}" como ${activity.completado ? 'no completada' : 'completada'}`}
+          aria-label={
+            isBlocked
+              ? `"${activity.actividad}" está bloqueada`
+              : `Marcar "${activity.actividad}" como ${activity.completado ? 'no completada' : 'completada'}`
+          }
         />
       </div>
       {activity.icono && (
@@ -39,7 +48,7 @@ const Activity = ({ activity, onToggle }) => {
         <span className={`activity-text ${activity.completado ? 'completed' : ''}`}>
           {activity.actividad}
         </span>
-        <span className="activity-type">{activity.tipo}</span>
+        {!isBlocked && <span className="activity-type">{activity.tipo}</span>}
       </div>
     </div>
   );
