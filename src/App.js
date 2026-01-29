@@ -458,6 +458,40 @@ export default function App() {
     });
   };
 
+  const handleUpdateActivity = (activityId, updates) => {
+    setWeeksData(prevWeeksData => {
+      const weekKey = currentWeek;
+      const weekActivities = Array.isArray(prevWeeksData[weekKey]) ? prevWeeksData[weekKey] : [];
+      const updatedActivities = weekActivities.map(activity => (
+        activity.id === activityId ? { ...activity, ...updates } : activity
+      ));
+
+      const newWeeksData = {
+        ...prevWeeksData,
+        [weekKey]: updatedActivities
+      };
+
+      localStorage.setItem(`week_${weekKey}`, JSON.stringify(updatedActivities));
+      return newWeeksData;
+    });
+  };
+
+  const handleDeleteActivity = (activityId) => {
+    setWeeksData(prevWeeksData => {
+      const weekKey = currentWeek;
+      const weekActivities = Array.isArray(prevWeeksData[weekKey]) ? prevWeeksData[weekKey] : [];
+      const updatedActivities = weekActivities.filter(activity => activity.id !== activityId);
+
+      const newWeeksData = {
+        ...prevWeeksData,
+        [weekKey]: updatedActivities
+      };
+
+      localStorage.setItem(`week_${weekKey}`, JSON.stringify(updatedActivities));
+      return newWeeksData;
+    });
+  };
+
   const handleCloseSettings = () => setShowSettingsModal(false);
 
   const handleOpenResources = () => setIsResourcesModalOpen(true);
@@ -681,6 +715,8 @@ export default function App() {
         onClose={handleCloseSettings} 
         onLogout={handleLogout}
         onAddActivity={handleAddActivity}
+        onUpdateActivity={handleUpdateActivity}
+        onDeleteActivity={handleDeleteActivity}
         currentWeekActivities={currentWeekData}
       />
 

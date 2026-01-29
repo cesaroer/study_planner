@@ -1,26 +1,49 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { FaTimes, FaPlus, FaSave, FaSmile } from 'react-icons/fa';
+import { FaTimes, FaPlus, FaSave, FaSmile, FaTrash, FaEdit } from 'react-icons/fa';
 import EmojiPicker from 'emoji-picker-react';
 import './SettingsModal.css';
-import { defaultActivities } from '../data/defaultActivities';
 
-// Group activities by their type
+const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+// Group activities by their type and collect days/ids
 const groupActivitiesByType = (activities) => {
   const grouped = {};
-  
-  // Process each day's activities
-  Object.values(activities).forEach(dayActivities => {
-    dayActivities.forEach(activity => {
-      if (!grouped[activity.tipo]) {
-        grouped[activity.tipo] = [];
+  const groupMap = new Map();
+
+  activities.forEach(activity => {
+    if (!activity || !activity.tipo || !activity.actividad) return;
+    const uniqueKey = `${activity.tipo}::${activity.actividad}::${activity.icono || ''}`;
+    if (!groupMap.has(uniqueKey)) {
+      groupMap.set(uniqueKey, {
+        key: uniqueKey,
+        actividad: activity.actividad,
+        tipo: activity.tipo,
+        icono: activity.icono || '📱',
+        dias: new Set(),
+        idsByDay: {}
+      });
+    }
+    const group = groupMap.get(uniqueKey);
+    if (activity.dia) {
+      group.dias.add(activity.dia);
+      if (activity.id) {
+        group.idsByDay[activity.dia] = activity.id;
       }
-      // Only add if not already in the array (to avoid duplicates)
-      if (!grouped[activity.tipo].some(a => a.actividad === activity.actividad)) {
-        grouped[activity.tipo].push(activity);
-      }
-    });
+    }
   });
-  
+
+  groupMap.forEach(group => {
+    const orderedDays = DAYS.filter(day => group.dias.has(day));
+    const entry = {
+      ...group,
+      dias: orderedDays
+    };
+    if (!grouped[group.tipo]) {
+      grouped[group.tipo] = [];
+    }
+    grouped[group.tipo].push(entry);
+  });
+
   return grouped;
 };
 
@@ -36,11 +59,14 @@ const ACTIVITY_TYPES = [
 // Available emoji icons for activities
 const EMOJI_ICONS = ['📱', '💻', '🌐', '⚡', '🤖', '🔄', '☁️', '⚙️', '📚', '🔧', '📊', '🌱'];
 
-export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity, currentWeekActivities = [] }) {
-  const [activitiesByType, setActivitiesByType] = useState({});
+export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity, onUpdateActivity, onDeleteActivity, currentWeekActivities = [] }) {
   const [isAddingActivity, setIsAddingActivity] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emojiPickerRef = useRef(null);
+  const editEmojiPickerRef = useRef(null);
+  const [editingActivityId, setEditingActivityId] = useState(null);
+  const [editingActivity, setEditingActivity] = useState(null);
+  const [editEmojiPickerId, setEditEmojiPickerId] = useState(null);
   const [newActivity, setNewActivity] = useState({
     actividad: '',
     tipo: 'Algoritmos',
@@ -48,24 +74,8 @@ export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity
     dias: []
   });
   
-  // Combine default activities with current week's activities
-  const allActivities = useMemo(() => {
-    const combined = { ...defaultActivities };
-    
-    // Add current week's activities
-    currentWeekActivities.forEach(activity => {
-      if (activity.dia && activity.actividad) {
-        if (!combined[activity.dia]) {
-          combined[activity.dia] = [];
-        }
-        // Only add if not already in the array (to avoid duplicates)
-        if (!combined[activity.dia].some(a => a.id === activity.id)) {
-          combined[activity.dia].push(activity);
-        }
-      }
-    });
-    
-    return combined;
+  const activitiesByType = useMemo(() => {
+    return groupActivitiesByType(currentWeekActivities);
   }, [currentWeekActivities]);
 
   // Cerrar el selector de emojis al hacer clic fuera
@@ -73,6 +83,9 @@ export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity
     const handleClickOutside = (event) => {
       if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
         setShowEmojiPicker(false);
+      }
+      if (editEmojiPickerRef.current && !editEmojiPickerRef.current.contains(event.target)) {
+        setEditEmojiPickerId(null);
       }
     };
 
@@ -82,10 +95,6 @@ export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity
     };
   }, []);
 
-  useEffect(() => {
-    setActivitiesByType(groupActivitiesByType(allActivities));
-  }, [allActivities]);
-  
   const handleEmojiClick = (emojiData) => {
     setNewActivity(prev => ({
       ...prev,
@@ -100,6 +109,22 @@ export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity
       ...prev,
       [name]: value
     }));
+  };
+
+  const handleEditInputChange = (e) => {
+    const { name, value } = e.target;
+    setEditingActivity(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleEditEmojiClick = (emojiData) => {
+    setEditingActivity(prev => ({
+      ...prev,
+      icono: emojiData.emoji
+    }));
+    setEditEmojiPickerId(null);
   };
   
   const handleAddNewActivity = (e) => {
@@ -144,6 +169,72 @@ export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity
       addActivities();
     }
   };
+
+  const handleStartEdit = (activity) => {
+    setEditingActivityId(activity.key);
+    setEditingActivity({
+      key: activity.key,
+      actividad: activity.actividad || '',
+      tipo: activity.tipo || 'Algoritmos',
+      icono: activity.icono || '📱',
+      dias: Array.isArray(activity.dias) ? activity.dias : [],
+      idsByDay: activity.idsByDay || {}
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingActivityId(null);
+    setEditingActivity(null);
+    setEditEmojiPickerId(null);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingActivity || !editingActivity.actividad.trim()) return;
+    const desiredDays = editingActivity.dias || [];
+    if (desiredDays.length === 0) return;
+
+    const updates = {
+      actividad: editingActivity.actividad.trim(),
+      tipo: editingActivity.tipo,
+      icono: editingActivity.icono
+    };
+
+    const existingByDay = editingActivity.idsByDay || {};
+    const existingDays = Object.keys(existingByDay);
+
+    if (onUpdateActivity) {
+      desiredDays.forEach(day => {
+        const existingId = existingByDay[day];
+        if (existingId) {
+          onUpdateActivity(existingId, { ...updates, dia: day });
+        } else if (onAddActivity) {
+          onAddActivity({ ...updates, completado: false }, day);
+        }
+      });
+    }
+
+    if (onDeleteActivity) {
+      existingDays.forEach(day => {
+        if (!desiredDays.includes(day)) {
+          onDeleteActivity(existingByDay[day]);
+        }
+      });
+    }
+
+    handleCancelEdit();
+  };
+
+  const handleDeleteActivity = (activityGroup) => {
+    if (!onDeleteActivity) return;
+    const confirmed = window.confirm('¿Seguro que quieres eliminar esta actividad?');
+    if (confirmed) {
+      const idsToDelete = activityGroup?.idsByDay ? Object.values(activityGroup.idsByDay) : [];
+      idsToDelete.forEach(id => onDeleteActivity(id));
+      if (editingActivityId === activityGroup?.key) {
+        handleCancelEdit();
+      }
+    }
+  };
   
   const toggleDay = (day) => {
     setNewActivity(prev => {
@@ -162,6 +253,24 @@ export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity
   
   const isDaySelected = (day) => {
     return newActivity.dias.includes(day);
+  };
+
+  const toggleEditDay = (day) => {
+    setEditingActivity(prev => {
+      if (!prev) return prev;
+      const dias = Array.isArray(prev.dias) ? [...prev.dias] : [];
+      const index = dias.indexOf(day);
+      if (index > -1) {
+        dias.splice(index, 1);
+      } else {
+        dias.push(day);
+      }
+      return { ...prev, dias };
+    });
+  };
+
+  const isEditDaySelected = (day) => {
+    return editingActivity?.dias?.includes(day);
   };
   
   if (!isOpen) return null;
@@ -239,7 +348,7 @@ export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity
                     <div className="days-selection">
                       <label>Días de la semana:</label>
                       <div className="days-grid">
-                        {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'].map(day => (
+                        {DAYS.map(day => (
                           <button
                             key={day}
                             type="button"
@@ -278,12 +387,114 @@ export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity
             <div key={type} className="activity-type-section">
               <h3 className="activity-type-title">{type}</h3>
               <div className="activity-grid">
-                {activities.map(activity => (
-                  <div key={activity.id} className="activity-card">
-                    <span className="activity-icon">{activity.icono}</span>
-                    <span className="activity-name">{activity.actividad}</span>
-                  </div>
-                ))}
+                {activities.map(activity => {
+                  const isEditing = editingActivityId === activity.key;
+                  return (
+                    <div key={activity.key} className={`activity-card ${isEditing ? 'is-editing' : ''}`}>
+                      {isEditing ? (
+                        <div className="activity-edit-form">
+                          <input
+                            type="text"
+                            name="actividad"
+                            value={editingActivity?.actividad || ''}
+                            onChange={handleEditInputChange}
+                            className="activity-input"
+                            placeholder="Nombre de la actividad"
+                          />
+                          <select
+                            name="tipo"
+                            value={editingActivity?.tipo || 'Algoritmos'}
+                            onChange={handleEditInputChange}
+                            className="activity-select"
+                          >
+                            {ACTIVITY_TYPES.map(type => (
+                              <option key={type} value={type}>{type}</option>
+                            ))}
+                          </select>
+                          <div className="days-selection">
+                            <label>Días de la semana:</label>
+                            <div className="days-grid">
+                              {DAYS.map(day => (
+                                <button
+                                  key={day}
+                                  type="button"
+                                  className={`day-button ${isEditDaySelected(day) ? 'selected' : ''}`}
+                                  onClick={() => toggleEditDay(day)}
+                                >
+                                  {day.substring(0, 3)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="icon-input-container" ref={editEmojiPickerRef}>
+                            <div
+                              className="emoji-picker-trigger"
+                              onClick={() => setEditEmojiPickerId(activity.key)}
+                            >
+                              <span className="icon-preview">{editingActivity?.icono || '📱'}</span>
+                              <FaSmile className="emoji-icon" />
+                            </div>
+                            {editEmojiPickerId === activity.key && (
+                              <div className="emoji-picker-container">
+                                <EmojiPicker
+                                  onEmojiClick={handleEditEmojiClick}
+                                  autoFocusSearch={false}
+                                  width="100%"
+                                  height={300}
+                                  searchPlaceholder="Buscar emoji..."
+                                  skinTonesDisabled
+                                  previewConfig={{
+                                    showPreview: false
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <div className="activity-actions edit-actions">
+                            <button
+                              className="activity-action-button save"
+                              type="button"
+                              onClick={handleSaveEdit}
+                              disabled={!editingActivity?.actividad?.trim() || !editingActivity?.dias?.length}
+                            >
+                              <FaSave />
+                            </button>
+                            <button
+                              className="activity-action-button cancel"
+                              type="button"
+                              onClick={handleCancelEdit}
+                            >
+                              <FaTimes />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="activity-icon">{activity.icono}</span>
+                          <span className="activity-name">{activity.actividad}</span>
+                          <div className="activity-actions">
+                            <button
+                              className="activity-action-button edit"
+                              type="button"
+                              onClick={() => handleStartEdit(activity)}
+                              title="Editar actividad"
+                            >
+                              <FaEdit />
+                            </button>
+                            <button
+                              className="activity-action-button delete"
+                              type="button"
+                              onClick={() => handleDeleteActivity(activity)}
+                              title="Eliminar actividad"
+                            >
+                              <FaTrash />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}
