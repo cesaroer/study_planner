@@ -30,12 +30,16 @@ const Activity = ({ activity, onToggle }) => {
           aria-label={`Marcar "${activity.actividad}" como ${activity.completado ? 'no completada' : 'completada'}`}
         />
       </div>
+      {activity.icono && (
+        <div className="activity-icon">
+          {activity.icono}
+        </div>
+      )}
       <div className="activity-info">
-        <span className="activity-type">{activity.tipo}</span>
         <span className={`activity-text ${activity.completado ? 'completed' : ''}`}>
-          {activity.icono && <span className="activity-icon">{activity.icono}</span>}
           {activity.actividad}
         </span>
+        <span className="activity-type">{activity.tipo}</span>
       </div>
     </div>
   );
