@@ -5,7 +5,7 @@ import DayView from './components/DayView';
 import DayDetailModal from './components/DayDetailModal'; 
 import { defaultActivities } from './data/defaultActivities';
 import ProgressBar from './components/ProgressBar';
-import { format, startOfWeek, addDays, parseISO, isBefore, startOfDay } from 'date-fns';
+import { format, startOfWeek, addDays, parseISO, isBefore, startOfDay, differenceInCalendarDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import CalendarModal from './components/CalendarModal';
 import FrequencyModal from './components/FrequencyModal';
@@ -274,16 +274,19 @@ export default function App() {
   
   const navigateWeek = (direction) => {
     const currentMonday = parseISO(currentWeek);
+    const currentWeekStart = startOfDay(currentMonday);
+    const currentSelected = startOfDay(selectedDate);
+
+    // Mantener el mismo día de la semana al navegar (ej: Mié -> Mié)
+    const rawOffset = differenceInCalendarDays(currentSelected, currentWeekStart);
+    const dayOffset = Math.min(6, Math.max(0, rawOffset));
+
     const newMonday = addDays(currentMonday, direction === 'next' ? 7 : -7);
     const newWeek = format(newMonday, 'yyyy-MM-dd');
     setCurrentWeek(newWeek);
-    
-    // Si la fecha seleccionada no está en la nueva semana, seleccionar el primer día de la semana
-    const selectedWeek = startOfWeek(parseISO(newWeek), { weekStartsOn: 1 });
-    const selectedWeekEnd = addDays(selectedWeek, 6);
-    if (selectedDate < selectedWeek || selectedDate > selectedWeekEnd) {
-      setSelectedDate(selectedWeek);
-    }
+
+    const newSelectedDate = addDays(startOfDay(newMonday), dayOffset);
+    setSelectedDate(newSelectedDate);
   };
   
   const completedCount = currentWeekData.filter(a => a.completado).length;
@@ -326,6 +329,30 @@ export default function App() {
     acc[day].push(activity);
     return acc;
   }, {});
+
+  // Ordenar actividades dentro de cada día por prioridad de tipo
+  const TYPE_PRIORITY = {
+    'Algoritmos': 1,
+    'Actividad Principal': 2,
+    'Principal': 2,
+    'Secundaria': 3,
+    'Menor Prioridad': 4,
+    'Menor prioridad': 4,
+    'Conocimiento Pasivo': 5,
+    'Conocimiento pasivo': 5
+  };
+
+  Object.keys(activitiesByDay).forEach(day => {
+    activitiesByDay[day] = (activitiesByDay[day] || []).slice().sort((a, b) => {
+      const pa = TYPE_PRIORITY[a?.tipo] ?? 999;
+      const pb = TYPE_PRIORITY[b?.tipo] ?? 999;
+      if (pa !== pb) return pa - pb;
+      // Desempate estable: por nombre (si existe)
+      const na = (a?.actividad || '').toString();
+      const nb = (b?.actividad || '').toString();
+      return na.localeCompare(nb);
+    });
+  });
   
   // Ensure all days exist in the object, even if empty
   days.forEach(day => {
