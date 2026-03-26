@@ -214,13 +214,19 @@ export default function App() {
 
   useEffect(() => {
     const initializeWeek = () => {
+      // No inicializar semanas si no hay usuario
+      if (!user || !user.username) return;
+
       // Inicializar solo si la semana no existe o está vacía
       if (weeksData[currentWeek] && weeksData[currentWeek].length > 0) return;
       
       console.log(`Inicializando semana: ${currentWeek}`);
       
       // Verificar si ya hay actividades para esta semana en localStorage
-      const storedWeekData = localStorage.getItem(`week_${currentWeek}`);
+      const userWeekStorageKey = `week_${user.username}_${currentWeek}`;
+      const legacyWeekStorageKey = `week_${currentWeek}`;
+      const storedWeekData =
+        localStorage.getItem(userWeekStorageKey) ?? localStorage.getItem(legacyWeekStorageKey);
       
       if (storedWeekData) {
         // Si hay datos guardados, usarlos
@@ -230,6 +236,8 @@ export default function App() {
             ...prev,
             [currentWeek]: parsedData
           }));
+          // Migrar/asegurar guardado por usuario
+          localStorage.setItem(userWeekStorageKey, JSON.stringify(parsedData));
           return;
         } catch (e) {
           console.error('Error al cargar datos de la semana:', e);
@@ -248,7 +256,7 @@ export default function App() {
       );
       
       // Guardar en localStorage para futuras cargas
-      localStorage.setItem(`week_${currentWeek}`, JSON.stringify(newWeekActivities));
+      localStorage.setItem(userWeekStorageKey, JSON.stringify(newWeekActivities));
       
       setWeeksData(prev => ({
         ...prev,
@@ -257,7 +265,7 @@ export default function App() {
     };
 
     initializeWeek();
-  }, [currentWeek, weeksData, setWeeksData]);
+  }, [currentWeek, weeksData, setWeeksData, user]);
 
   const currentWeekData = Array.isArray(weeksData[currentWeek]) ? weeksData[currentWeek] : [];
 
@@ -484,7 +492,14 @@ export default function App() {
       }
       
       // Save to localStorage
-      localStorage.setItem('weeksData', JSON.stringify(newWeeksData));
+      if (user && user.username) {
+        localStorage.setItem(
+          `week_${user.username}_${weekKey}`,
+          JSON.stringify(newWeeksData[weekKey] || [])
+        );
+      } else {
+        localStorage.setItem(`week_${weekKey}`, JSON.stringify(newWeeksData[weekKey] || []));
+      }
       
       return newWeeksData;
     });
@@ -503,7 +518,11 @@ export default function App() {
         [weekKey]: updatedActivities
       };
 
-      localStorage.setItem(`week_${weekKey}`, JSON.stringify(updatedActivities));
+      if (user && user.username) {
+        localStorage.setItem(`week_${user.username}_${weekKey}`, JSON.stringify(updatedActivities));
+      } else {
+        localStorage.setItem(`week_${weekKey}`, JSON.stringify(updatedActivities));
+      }
       return newWeeksData;
     });
   };
@@ -519,7 +538,11 @@ export default function App() {
         [weekKey]: updatedActivities
       };
 
-      localStorage.setItem(`week_${weekKey}`, JSON.stringify(updatedActivities));
+      if (user && user.username) {
+        localStorage.setItem(`week_${user.username}_${weekKey}`, JSON.stringify(updatedActivities));
+      } else {
+        localStorage.setItem(`week_${weekKey}`, JSON.stringify(updatedActivities));
+      }
       return newWeeksData;
     });
   };
