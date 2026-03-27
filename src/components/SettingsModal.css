@@ -1,229 +1,189 @@
-/* Estilos base del modal */
+/* Settings Modal */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(5px);
+  background: rgba(0, 0, 0, 0.8);
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
+  padding-top: 100px;
   z-index: 1000;
 }
 
-/* Contenedor principal del modal de ajustes */
 .settings-modal {
-  background: rgba(26, 28, 32, 0.95);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
+  background: #0a0a0a;
+  border-radius: 12px;
   width: 90%;
   max-width: 580px;
-  max-height: 90vh;
+  max-height: calc(100vh - 200px);
   overflow-y: auto;
-  padding: 0;
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
-  color: #E0E0E0;
-  position: relative;
+  border: 1px solid #1a1a1a;
 }
 
-/* Encabezado del modal */
 .modal-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 24px 28px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #111;
   position: sticky;
   top: 0;
-  background: rgba(26, 28, 32, 0.95);
-  backdrop-filter: blur(20px);
+  background: #0a0a0a;
   z-index: 10;
 }
 
 .modal-header h2 {
   margin: 0;
-  font-size: 1.6rem;
-  font-weight: 700;
-  color: #ffffff;
-  letter-spacing: -0.3px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
 }
 
-/* Botón de cierre */
 .modal-close-button {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  width: 40px;
-  height: 40px;
+  background: transparent;
+  border: none;
+  color: #555;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 18px;
+  line-height: 1;
+  transition: all 0.1s;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.8);
-  transition: all 0.2s;
-  font-size: 1.1rem;
 }
 
 .modal-close-button:hover {
-  background: rgba(255, 86, 86, 0.2);
-  border-color: rgba(255, 86, 86, 0.3);
-  color: #ff5656;
-  transform: scale(1.05);
+  background: #111;
+  color: #fff;
 }
 
-.modal-close-button:active {
-  transform: scale(0.95);
-}
-
-/* Contenido del modal */
 .settings-content {
-  padding: 24px 28px 28px;
-  max-height: 60vh;
-  overflow-y: auto;
+  padding: 20px 24px 24px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
-}
-
-/* Estilos para el formulario de agregar actividad */
-.settings-actions {
-  margin-bottom: 0;
+  gap: 16px;
 }
 
 .add-activity-button {
-  background: rgba(37, 117, 252, 0.15);
-  color: #ffffff;
-  border: 1px solid rgba(37, 117, 252, 0.4);
-  border-radius: 10px;
-  padding: 12px 20px;
+  background: transparent;
+  border: 1px dashed #2a2a2a;
+  color: #666;
+  padding: 14px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 500;
-  transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(37, 117, 252, 0.15);
+  gap: 8px;
+  transition: all 0.1s;
 }
 
 .add-activity-button:hover {
-  background: rgba(37, 117, 252, 0.25);
-  border-color: rgba(37, 117, 252, 0.5);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(37, 117, 252, 0.25);
-}
-
-.add-activity-button:active {
-  transform: translateY(0);
+  border-color: #444;
+  color: #fff;
+  background: #0a0a0a;
 }
 
 .add-activity-form {
-  background: rgba(37, 117, 252, 0.08);
-  border-radius: 14px;
-  padding: 20px;
-  border: 1px solid rgba(37, 117, 252, 0.25);
-  box-shadow: 0 2px 12px rgba(37, 117, 252, 0.1);
-}
-
-.add-activity-form .activity-input,
-.add-activity-form .activity-select {
-  box-sizing: border-box;
-  max-width: 100%;
-  min-width: 0;
+  background: #111;
+  border: 1px solid #1a1a1a;
+  border-radius: 8px;
+  padding: 16px;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .activity-input,
 .activity-select {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  padding: 11px 14px;
-  color: #ffffff;
-  font-size: 0.95rem;
+  background: #0a0a0a;
+  border: 1px solid #222;
+  border-radius: 6px;
+  padding: 10px 14px;
+  color: #fff;
+  font-size: 14px;
   width: 100%;
-  transition: all 0.2s;
+  transition: border 0.1s;
 }
 
 .activity-input:focus,
 .activity-select:focus {
   outline: none;
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(37, 117, 252, 0.5);
-  box-shadow: 0 0 0 3px rgba(37, 117, 252, 0.15);
+  border-color: #333;
 }
 
 .activity-input::placeholder {
-  color: rgba(255, 255, 255, 0.45);
+  color: #444;
+}
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23555%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 14px;
+  padding-right: 36px;
 }
 
 .form-actions {
   display: flex;
-  gap: 12px;
-  margin-top: 8px;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 .save-button,
 .cancel-button {
-  flex: 1;
-  padding: 12px;
-  border-radius: 10px;
-  font-size: 0.95rem;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-size: 14px;
   font-weight: 500;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.1s;
 }
 
 .save-button {
-  background: rgba(37, 117, 252, 0.25);
-  color: #ffffff;
-  border: 1px solid rgba(37, 117, 252, 0.4);
-  box-shadow: 0 2px 6px rgba(37, 117, 252, 0.15);
+  background: #fff;
+  border: none;
+  color: #000;
 }
 
 .save-button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-  box-shadow: none;
 }
 
 .save-button:not(:disabled):hover {
-  background: rgba(37, 117, 252, 0.35);
-  border-color: rgba(37, 117, 252, 0.5);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(37, 117, 252, 0.2);
-}
-
-.save-button:not(:disabled):active {
-  transform: translateY(0);
+  opacity: 0.85;
 }
 
 .cancel-button {
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  border: 1px solid #222;
+  color: #888;
 }
 
 .cancel-button:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.2);
+  background: #111;
+  color: #fff;
 }
 
-/* Estilos para el selector de emojis */
 .icon-input-container {
   position: relative;
   z-index: 10;
@@ -232,493 +192,201 @@
 .emoji-picker-trigger {
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  padding: 10px 14px;
+  gap: 10px;
+  background: #0a0a0a;
+  border: 1px solid #222;
+  border-radius: 6px;
+  padding: 10px 12px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: border 0.1s;
 }
 
 .emoji-picker-trigger:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(37, 117, 252, 0.3);
+  border-color: #333;
+}
+
+.icon-preview {
+  font-size: 18px;
+}
+
+.emoji-icon {
+  color: #555;
+  font-size: 14px;
 }
 
 .emoji-picker-container {
   position: absolute;
   bottom: 100%;
   left: 0;
-  margin-bottom: 12px;
-  width: 100%;
-  border-radius: 14px;
+  margin-bottom: 8px;
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+  border: 1px solid #1a1a1a;
 }
 
-.emoji-picker-container .emoji-picker-react {
-  background: rgba(26, 28, 32, 0.98) !important;
-  border: none !important;
-  box-shadow: none !important;
-}
-
-.emoji-picker-container .emoji-search {
-  background: rgba(255, 255, 255, 0.08) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  color: #ffffff !important;
-  border-radius: 10px !important;
-  margin: 12px !important;
-  padding: 10px 14px !important;
-}
-
-.emoji-picker-container .emoji-categories {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-}
-
-.emoji-picker-container .emoji-scroll-wrapper::-webkit-scrollbar {
-  width: 6px;
-}
-
-.emoji-picker-container .emoji-scroll-wrapper::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
-}
-
-.emoji-icon {
-  color: #E0E0E0;
-  opacity: 0.8;
-  transition: all 0.2s;
-}
-
-.emoji-picker-trigger:hover .emoji-icon {
-  opacity: 1;
-  transform: scale(1.1);
-}
-
-.icon-preview {
-  font-size: 2rem;
-  min-width: 44px;
-  text-align: center;
-  line-height: 1;
-}
-
-/* Estilos para el input de icono (ahora oculto) */
-.icon-input {
-  display: none;
-}
-
-/* Estilos para la selección de días */
 .days-selection {
-  margin: 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .days-selection label {
-  display: block;
-  margin-bottom: 10px;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 0.9rem;
+  font-size: 12px;
   font-weight: 500;
+  color: #555;
 }
 
 .days-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
-  margin-bottom: 10px;
+  display: flex;
+  gap: 4px;
 }
 
 .day-button {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 10px 0;
-  color: rgba(255, 255, 255, 0.7);
+  background: #0a0a0a;
+  border: 1px solid #1a1a1a;
+  color: #666;
+  padding: 8px 12px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s;
-  font-size: 0.8rem;
+  font-size: 12px;
   font-weight: 500;
-  text-align: center;
+  transition: all 0.1s;
 }
 
 .day-button:hover {
-  background: rgba(37, 117, 252, 0.15);
-  border-color: rgba(37, 117, 252, 0.3);
-  color: #ffffff;
-  transform: translateY(-1px);
+  background: #111;
 }
 
 .day-button.selected {
-  background: rgba(37, 117, 252, 0.3);
-  border-color: rgba(37, 117, 252, 0.5);
-  color: #ffffff;
-  font-weight: 600;
-  box-shadow: 0 2px 6px rgba(37, 117, 252, 0.2);
+  background: #fff;
+  border-color: #fff;
+  color: #000;
 }
 
-.day-button:active {
-  transform: translateY(0);
-}
-
-/* Estilos para el selector de emojis en dispositivos móviles */
-@media (max-width: 768px) {
-  .emoji-picker-container {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    top: auto;
-    margin: 0;
-    width: 100%;
-    border-radius: 16px 16px 0 0;
-    max-height: 60vh;
-  }
-  
-  .emoji-picker-container .emoji-picker-react {
-    height: 100% !important;
-    max-height: 60vh !important;
-  }
-}
-
-/* Estilos para los selects personalizados */
-select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23E0E0E0%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  background-size: 12px;
-  padding-right: 30px;
-}
-
-/* Secciones de actividades */
 .activity-type-section {
-  margin-bottom: 28px;
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 14px;
-  padding: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.activity-type-section:last-child {
-  margin-bottom: 0;
+  margin-top: 16px;
 }
 
 .activity-type-title {
-  color: #fff;
-  margin: 0 0 18px 0;
-  font-size: 1.15rem;
+  font-size: 10px;
   font-weight: 600;
-  padding-bottom: 10px;
-  border-bottom: 2px solid rgba(37, 117, 252, 0.3);
-  letter-spacing: 0.3px;
+  color: #444;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0 0 8px 0;
+  padding: 0 4px;
 }
 
 .activity-grid {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 4px;
 }
 
 .activity-card {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  padding: 14px 18px;
   display: flex;
   align-items: center;
-  gap: 16px;
-  transition: all 0.2s ease;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  position: relative;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #111;
+  border-radius: 8px;
+  transition: background 0.1s;
 }
 
 .activity-card:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(37, 117, 252, 0.3);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  background: #161616;
 }
 
-.activity-card:focus-within {
-  border-color: rgba(37, 117, 252, 0.5);
-  box-shadow: 0 0 0 2px rgba(37, 117, 252, 0.2);
+.activity-card.is-editing {
+  background: #111;
+  border: 1px solid #fff;
+  flex-wrap: wrap;
 }
 
 .activity-icon {
-  font-size: 1.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  background: rgba(37, 117, 252, 0.15);
-  border-radius: 10px;
+  font-size: 16px;
   flex-shrink: 0;
-  border: 1px solid rgba(37, 117, 252, 0.2);
 }
 
 .activity-name {
-  font-size: 1rem;
-  color: #ffffff;
-  font-weight: 500;
-  line-height: 1.4;
   flex: 1;
+  font-size: 14px;
+  color: #ccc;
   min-width: 0;
 }
 
 .activity-actions {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   flex-shrink: 0;
 }
 
 .activity-action-button {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #E0E0E0;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: transparent;
+  border: none;
+  color: #555;
+  padding: 6px;
+  border-radius: 4px;
   cursor: pointer;
-  transition: all 0.2s;
-  font-size: 0.9rem;
+  transition: all 0.1s;
+  font-size: 12px;
 }
 
 .activity-action-button:hover {
-  background: rgba(255, 255, 255, 0.12);
-  transform: scale(1.05);
-}
-
-.activity-action-button:active {
-  transform: scale(0.95);
-}
-
-.activity-action-button.edit {
-  color: #6ba3ff;
-}
-
-.activity-action-button.edit:hover {
-  background: rgba(107, 163, 255, 0.15);
-  border-color: rgba(107, 163, 255, 0.3);
-}
-
-.activity-action-button.delete {
-  color: #ff6b6b;
+  background: #1a1a1a;
+  color: #fff;
 }
 
 .activity-action-button.delete:hover {
-  background: rgba(255, 107, 107, 0.15);
-  border-color: rgba(255, 107, 107, 0.3);
-}
-
-.activity-action-button.save {
-  color: #51cf66;
-}
-
-.activity-action-button.save:hover {
-  background: rgba(81, 207, 102, 0.15);
-  border-color: rgba(81, 207, 102, 0.3);
-}
-
-.activity-action-button.cancel {
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.activity-action-button.cancel:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.activity-card.is-editing {
-  align-items: stretch;
-  padding: 20px;
-  background: rgba(37, 117, 252, 0.08);
-  border-color: rgba(37, 117, 252, 0.3);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  overflow: hidden;
+  color: #888;
+  background: #111;
 }
 
 .activity-edit-form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   width: 100%;
-}
-
-.activity-edit-form .activity-input,
-.activity-edit-form .activity-select,
-.activity-edit-form .icon-input-container {
-  width: 100%;
-}
-
-.activity-edit-form .activity-input,
-.activity-edit-form .activity-select {
-  font-size: 0.95rem;
-  padding: 11px 14px;
-  box-sizing: border-box;
-  max-width: 100%;
-  min-width: 0;
-}
-
-.activity-edit-form .days-selection {
-  margin: 0;
-}
-
-.activity-edit-form .days-grid {
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.activity-edit-form .day-button {
-  padding: 10px 4px;
-  font-size: 0.75rem;
-}
-
-@media (max-width: 640px) {
-  .activity-edit-form .days-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
+  padding-top: 8px;
 }
 
 .activity-actions.edit-actions {
   justify-content: flex-end;
-  margin-left: 0;
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-/* Toggle bloquear */
-.block-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.85);
-  cursor: pointer;
-  user-select: none;
-}
-
-.block-toggle input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-}
-
-.block-toggle span {
-  font-size: 0.95rem;
-  font-weight: 500;
-}
-
-/* Secciones de configuración */
-.settings-section {
-  margin-bottom: 28px;
-}
-
-.settings-section h3 {
-  color: #fff;
-  margin: 0 0 16px 0;
-  font-size: 1.1rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-}
-
-/* Botones de configuración */
-.settings-button {
-  background: rgba(37, 117, 252, 0.2);
-  color: #E0E0E0;
-  border: 1px solid rgba(37, 117, 252, 0.3);
-  border-radius: 8px;
-  padding: 12px 20px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #1a1a1a;
   width: 100%;
-  text-align: left;
-  margin: 8px 0;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 1rem;
+}
+
+.block-toggle {
   display: flex;
   align-items: center;
-}
-
-.settings-button:hover {
-  background: rgba(37, 117, 252, 0.3);
-  transform: translateY(-1px);
-}
-
-/* Opciones de tema */
-.theme-option {
-  display: flex;
-  align-items: center;
-  margin: 12px 0;
-  padding: 10px;
-  border-radius: 8px;
-  transition: background 0.2s;
-}
-
-.theme-option:hover {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.theme-option input[type="radio"] {
-  margin-right: 12px;
-  width: 18px;
-  height: 18px;
+  gap: 8px;
+  font-size: 13px;
+  color: #666;
   cursor: pointer;
 }
 
-.theme-option label {
+.block-toggle input {
+  accent-color: #fff;
+  width: 16px;
+  height: 16px;
   cursor: pointer;
-  font-size: 0.95rem;
-  color: #E0E0E0;
 }
 
-/* Scrollbar personalizada */
-.settings-modal::-webkit-scrollbar {
-  width: 8px;
-}
-
-.settings-modal::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 10px;
-  margin: 8px 0;
-}
-
-.settings-modal::-webkit-scrollbar-thumb {
-  background: rgba(37, 117, 252, 0.3);
-  border-radius: 10px;
-}
-
-.settings-modal::-webkit-scrollbar-thumb:hover {
-  background: rgba(37, 117, 252, 0.5);
-}
-
-.settings-content::-webkit-scrollbar {
-  width: 8px;
-}
-
-.settings-content::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 10px;
-}
-
-.settings-content::-webkit-scrollbar-thumb {
-  background: rgba(37, 117, 252, 0.3);
-  border-radius: 10px;
-}
-
-.settings-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(37, 117, 252, 0.5);
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding-top: 40px;
+    align-items: flex-start;
+  }
+  
+  .settings-modal {
+    max-height: calc(100vh - 80px);
+    border-radius: 12px 12px 0 0;
+  }
+  
+  .days-grid {
+    flex-wrap: wrap;
+  }
 }

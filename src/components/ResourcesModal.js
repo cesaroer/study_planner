@@ -16,7 +16,7 @@ const ResourcesModal = ({ isOpen, onClose, activities, onAddActivity, theme }) =
 
   return (
     <div className="modal-overlay">
-      <div className={`modal-content ${theme === 'dark' ? 'dark-mode' : ''}`}>
+      <div className={`modal-content resources-modal ${theme === 'dark' ? 'dark-mode' : ''}`}>
         <button className="close-button" onClick={onClose}>
           <FaTimes />
         </button>
