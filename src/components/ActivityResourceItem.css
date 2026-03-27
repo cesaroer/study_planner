@@ -1,16 +1,20 @@
-/* Activity Resource Item */
 .activity-resource {
   display: flex;
   align-items: center;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 10px;
-  transition: background 0.15s ease;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: var(--radius-item);
+  border: 1px solid var(--stroke-soft);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
   cursor: pointer;
+  transition: all var(--ease-standard);
 }
 
 .activity-resource:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.11);
+  border-color: var(--stroke-strong);
 }
 
 .activity-resource .activity-main {
@@ -18,57 +22,64 @@
   justify-content: space-between;
   align-items: center;
   width: 100%;
+  gap: 10px;
 }
 
 .activity-resource .activity-info {
-  display: flex;
-  flex-direction: column;
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .activity-resource .activity-type {
-  font-size: 9px;
-  font-weight: 600;
-  color: #666;
-  margin-bottom: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-low);
   text-transform: uppercase;
-  letter-height: 0.5px;
+  letter-spacing: 0.06em;
 }
 
 .activity-resource .activity-text {
   display: flex;
   align-items: center;
-  font-size: 14px;
-  color: #ccc;
+  gap: 8px;
+  color: var(--text-hi);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .activity-resource .activity-icon {
-  margin-right: 8px;
-  font-size: 14px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.25);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
 }
 
 .activity-resource .expand-icon {
-  color: #444;
-  font-size: 10px;
-  margin-left: 8px;
-  transition: color 0.15s;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-low);
+  background: rgba(255, 255, 255, 0.04);
+  transition: all var(--ease-standard);
 }
 
 .activity-resource:hover .expand-icon {
-  color: #777;
-}
-
-@media (max-width: 480px) {
-  .activity-resource {
-    padding: 10px;
-  }
-  
-  .activity-resource .activity-type {
-    font-size: 8px;
-  }
-  
-  .activity-resource .activity-text {
-    font-size: 13px;
-  }
+  color: var(--text-hi);
+  border-color: var(--stroke-strong);
+  background: rgba(255, 255, 255, 0.12);
 }

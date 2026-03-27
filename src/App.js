@@ -12,6 +12,7 @@ import FrequencyModal from './components/FrequencyModal';
 import SettingsModal from './components/SettingsModal';
 import ResourcesModal from './components/ResourcesModal';
 import { encryptData, decryptData } from './auth/cryptoUtils';
+import { FaThLarge, FaChartLine, FaCalendarAlt, FaBook, FaCog } from 'react-icons/fa';
 
 // Utilidad simple para generar UUID v4
 function generateUUID() {
@@ -406,6 +407,7 @@ export default function App() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isResourcesModalOpen, setIsResourcesModalOpen] = useState(false);
   const [customActivities, setCustomActivities] = useState({});
+  const [activeSidebarSection, setActiveSidebarSection] = useState('dashboard');
 
   const handleSaveNotes = (dayKey, newNotes) => {
     setNotes(prevNotes => ({ ...prevNotes, [dayKey]: newNotes }));
@@ -442,18 +444,36 @@ export default function App() {
   };
 
   const handleOpenCalendar = () => {
+    setActiveSidebarSection('calendar');
+    setShowFrequencyModal(false);
+    setShowSettingsModal(false);
+    setIsResourcesModalOpen(false);
     setIsCalendarModalOpen(true);
   };
 
   const handleCloseCalendar = () => {
     setIsCalendarModalOpen(false);
+    setActiveSidebarSection('dashboard');
   };
 
   const handleOpenFrequency = () => {
+    setActiveSidebarSection('activity');
+    setIsCalendarModalOpen(false);
+    setShowSettingsModal(false);
+    setIsResourcesModalOpen(false);
     setShowFrequencyModal(true);
   };
 
+  const handleCloseFrequency = () => {
+    setShowFrequencyModal(false);
+    setActiveSidebarSection('dashboard');
+  };
+
   const handleOpenSettings = () => {
+    setActiveSidebarSection('settings');
+    setIsCalendarModalOpen(false);
+    setShowFrequencyModal(false);
+    setIsResourcesModalOpen(false);
     setShowSettingsModal(true);
   };
 
@@ -547,10 +567,31 @@ export default function App() {
     });
   };
 
-  const handleCloseSettings = () => setShowSettingsModal(false);
+  const handleCloseSettings = () => {
+    setShowSettingsModal(false);
+    setActiveSidebarSection('dashboard');
+  };
 
-  const handleOpenResources = () => setIsResourcesModalOpen(true);
-  const handleCloseResources = () => setIsResourcesModalOpen(false);
+  const handleOpenResources = () => {
+    setActiveSidebarSection('resources');
+    setIsCalendarModalOpen(false);
+    setShowFrequencyModal(false);
+    setShowSettingsModal(false);
+    setIsResourcesModalOpen(true);
+  };
+
+  const handleCloseResources = () => {
+    setIsResourcesModalOpen(false);
+    setActiveSidebarSection('dashboard');
+  };
+
+  const handleSidebarDashboard = () => {
+    setActiveSidebarSection('dashboard');
+    setIsCalendarModalOpen(false);
+    setShowFrequencyModal(false);
+    setShowSettingsModal(false);
+    setIsResourcesModalOpen(false);
+  };
 
   const updateCompletions = (date, activityId, completed) => {
     setCompletions(prev => {
@@ -662,84 +703,163 @@ export default function App() {
 
     return (
       <div className="login-bg">
-        <div className="login-card">
-          <div className="login-logo">
-            <span className="logo-circle">🟦</span>
+        <div className="login-layout">
+          <div className="login-card">
+            <div className="login-logo">
+              <span className="logo-circle">◉</span>
+            </div>
+            <h2 className="login-title">{authMode === 'login' ? 'Sign in to Study Planner' : 'Crea tu cuenta'}</h2>
+            <p className="login-sub">
+              {authMode === 'login'
+                ? 'Continuar con tu dashboard de estudio'
+                : 'Elige tu usuario para crear tu cuenta'}
+            </p>
+            {loginError && <p className="login-error">{loginError}</p>}
+            <form className="login-form" onSubmit={handleForm}>
+              <div className="login-field">
+                <input type="text" name="username" placeholder="Nombre de usuario" autoComplete="username" required defaultValue={pendingUsername} />
+              </div>
+              <button className="login-btn" type="submit">{authMode === 'login' ? 'Login' : 'Crear cuenta'}</button>
+            </form>
+            {authMode === 'register' && (
+              <div style={{ textAlign: 'center', marginTop: 10 }}>
+                <button className="login-link" onClick={() => { setAuthMode('login'); setLoginError(''); }}>
+                  Volver a inicio de sesión
+                </button>
+              </div>
+            )}
           </div>
-          <h2 className="login-title">{authMode === 'login' ? 'Welcome Back' : 'Crea tu cuenta'}</h2>
-          <p className="login-sub">
-            {authMode === 'login'
-              ? 'Ingresa tu usuario y contraseña para acceder'
-              : 'Elige tu usuario y contraseña para crear tu cuenta'}
-          </p>
-          {loginError && <p className="login-error">{loginError}</p>}
-          <form className="login-form" onSubmit={handleForm}>
-            <div className="login-field">
-              <input type="text" name="username" placeholder="Nombre de usuario" autoComplete="username" required defaultValue={pendingUsername} />
+
+          <div className="login-preview">
+            <div className="login-preview-panel">
+              <div className="preview-top">
+                <span className="preview-brand-dot">◉</span>
+                <span>Dashboard</span>
+              </div>
+              <div className="preview-metrics">
+                <div className="preview-line" />
+                <div className="preview-line short" />
+                <div className="preview-ring" />
+              </div>
+              <div className="preview-bars">
+                {[32, 48, 28, 62, 39, 54, 44].map((height, idx) => (
+                  <span key={idx} style={{ height: `${height}%` }} />
+                ))}
+              </div>
             </div>
-            <button className="login-btn" type="submit">{authMode === 'login' ? 'Login' : 'Crear cuenta'}</button>
-          </form>
-          {authMode === 'register' && (
-            <div style={{textAlign:'center',marginTop:10}}>
-              <button className="login-link" style={{background:'none',border:'none',color:'#69f',cursor:'pointer'}} onClick={()=>{setAuthMode('login');setLoginError('');}}>Volver a inicio de sesión</button>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="app">
-      <div className="user-bar">
-        <span>Bienvenido, {user.username}</span>
-        <button onClick={handleLogout}>Salir</button>
-      </div>
-      
-      <h1 className="app-title">Agenda de Estudio</h1>
-      
-      <WeekNavigation 
-        onPrev={() => navigateWeek('prev')} 
-        onNext={() => navigateWeek('next')} 
-        currentWeek={currentWeek} 
-        onOpenCalendar={handleOpenCalendar}
-        onOpenFrequency={handleOpenFrequency}
-        onOpenSettings={handleOpenSettings}
-        onOpenResources={handleOpenResources}
-        onSelectDate={setSelectedDate}
-        selectedDate={selectedDate}
-      />
-      
-      <div className="progress-summary">
-        <p>{progressText}</p>
-        <ProgressBar progress={progress} />
-      </div>
-      
-      <div className="week-view">
-        {days.map((day, index) => {
-          const dayDate = addDays(parseISO(currentWeek), index);
-          const isPast = isBefore(startOfDay(dayDate), today);
-          const formattedDate = format(dayDate, 'yyyy-MM-dd');
-          const isSelected = format(selectedDate, 'yyyy-MM-dd') === formattedDate;
-          
-          return (
-            <div key={day} className={`day-container ${isSelected ? 'selected-day' : ''}`}>
-              <DayView 
-                day={day} 
-                dayNumber={getDayNumber(day)}
-                activities={activitiesByDay[day] || []} 
-                onToggle={handleToggleActivity} 
-                onDayClick={() => {
-                  setSelectedDate(dayDate);
-                  handleDayClick(day);
-                }}
-                isToday={isCurrentDay(day)}
-                isPast={isPast}
-                isSelected={isSelected}
-              />
-            </div>
-          );
-        })}
+    <div className="dashboard-shell">
+      <aside className="dashboard-sidebar">
+        <div className="sidebar-brand">
+          <span className="sidebar-brand-dot">◉</span>
+          <span>Studycart</span>
+        </div>
+        <nav className="sidebar-nav">
+          <button
+            className={`sidebar-nav-item ${activeSidebarSection === 'dashboard' ? 'active' : ''}`}
+            type="button"
+            onClick={handleSidebarDashboard}
+          >
+            <FaThLarge />
+            <span>Dashboard</span>
+          </button>
+          <button
+            className={`sidebar-nav-item ${activeSidebarSection === 'activity' ? 'active' : ''}`}
+            type="button"
+            onClick={handleOpenFrequency}
+          >
+            <FaChartLine />
+            <span>Actividad</span>
+          </button>
+          <button
+            className={`sidebar-nav-item ${activeSidebarSection === 'calendar' ? 'active' : ''}`}
+            type="button"
+            onClick={handleOpenCalendar}
+          >
+            <FaCalendarAlt />
+            <span>Calendario</span>
+          </button>
+          <button
+            className={`sidebar-nav-item ${activeSidebarSection === 'resources' ? 'active' : ''}`}
+            type="button"
+            onClick={handleOpenResources}
+          >
+            <FaBook />
+            <span>Recursos</span>
+          </button>
+          <button
+            className={`sidebar-nav-item ${activeSidebarSection === 'settings' ? 'active' : ''}`}
+            type="button"
+            onClick={handleOpenSettings}
+          >
+            <FaCog />
+            <span>Ajustes</span>
+          </button>
+        </nav>
+        <div className="sidebar-user">{user.username}</div>
+      </aside>
+
+      <div className="app dashboard-main">
+        <div className="user-bar">
+          <span>Bienvenido, {user.username}</span>
+          <button onClick={handleLogout}>Salir</button>
+        </div>
+
+        <h1 className="app-title">Agenda de Estudio</h1>
+
+        <WeekNavigation
+          onPrev={() => navigateWeek('prev')}
+          onNext={() => navigateWeek('next')}
+          currentWeek={currentWeek}
+          onOpenCalendar={handleOpenCalendar}
+          onOpenFrequency={handleOpenFrequency}
+          onOpenSettings={handleOpenSettings}
+          onOpenResources={handleOpenResources}
+          onSelectDate={setSelectedDate}
+          selectedDate={selectedDate}
+          showActions={false}
+        />
+
+        <div className="progress-summary">
+          <p>{progressText}</p>
+          <ProgressBar progress={progress} />
+        </div>
+
+        <div className="week-view">
+          {days.map((day, index) => {
+            const dayDate = addDays(parseISO(currentWeek), index);
+            const isPast = isBefore(startOfDay(dayDate), today);
+            const isTodayDay = isCurrentDay(day);
+            const isFuture = !isPast && !isTodayDay;
+            const formattedDate = format(dayDate, 'yyyy-MM-dd');
+            const isSelected = format(selectedDate, 'yyyy-MM-dd') === formattedDate;
+
+            return (
+              <div key={day} className={`day-container ${isSelected ? 'selected-day' : ''}`}>
+                <DayView
+                  day={day}
+                  dayNumber={getDayNumber(day)}
+                  activities={activitiesByDay[day] || []}
+                  onToggle={handleToggleActivity}
+                  onDayClick={() => {
+                    setSelectedDate(dayDate);
+                    handleDayClick(day);
+                  }}
+                  isToday={isTodayDay}
+                  isPast={isPast}
+                  isFuture={isFuture}
+                  isSelected={isSelected}
+                />
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {isModalOpen && selectedDay && (
@@ -764,7 +884,7 @@ export default function App() {
       {showFrequencyModal && (
         <FrequencyModal
           isOpen={showFrequencyModal}
-          onClose={() => setShowFrequencyModal(false)}
+          onClose={handleCloseFrequency}
           activities={allActivities}
           currentWeek={currentWeek}
         />
@@ -780,7 +900,7 @@ export default function App() {
         currentWeekActivities={currentWeekData}
       />
 
-<ResourcesModal
+      <ResourcesModal
         isOpen={isResourcesModalOpen}
         onClose={handleCloseResources}
         activities={allActivities}

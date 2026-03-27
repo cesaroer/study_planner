@@ -13,6 +13,8 @@ const WeekTabs = ({ currentWeek, selectedDate, onSelectDate }) => {
     const isSelected = format(dayDate, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
     const isToday = format(dayDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
     const isPast = isBefore(dayDate, today);
+    const isFuture = !isPast && !isToday;
+    const temporalState = isToday ? 'today' : isPast ? 'past' : 'future';
     
     return {
       date: dayDate,
@@ -21,6 +23,8 @@ const WeekTabs = ({ currentWeek, selectedDate, onSelectDate }) => {
       isSelected,
       isToday,
       isPast,
+      isFuture,
+      temporalState,
     };
   });
 
@@ -29,7 +33,7 @@ const WeekTabs = ({ currentWeek, selectedDate, onSelectDate }) => {
       {days.map((day, index) => (
         <button
           key={index}
-          className={`day-tab ${day.isSelected ? 'selected' : ''} ${day.isToday ? 'today' : ''} ${day.isPast ? 'past' : ''}`}
+          className={`day-tab ${day.isSelected ? 'selected' : ''} ${day.temporalState}`}
           onClick={() => onSelectDate(day.date)}
         >
           <span className="day-name">{day.dayName}</span>

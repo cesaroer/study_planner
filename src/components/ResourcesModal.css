@@ -1,97 +1,87 @@
-/* Resources Modal - Squircle iOS */
 .resources-modal {
-  background: rgba(40, 40, 40, 0.85);
-  backdrop-filter: blur(60px) saturate(180%);
-  -webkit-backdrop-filter: blur(60px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 30px;
-  width: 90%;
-  max-width: 580px;
-  max-height: calc(100vh - 200px);
-  overflow-y: auto;
+  width: min(640px, 100%);
+  max-height: calc(100vh - 120px);
   position: relative;
-  padding: 24px;
-  box-shadow: 0 32px 64px rgba(0, 0, 0, 0.4),
-              0 8px 24px rgba(0, 0, 0, 0.3),
-              inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  padding: 18px;
+  border-radius: 30px;
+  border: 1px solid var(--stroke-soft);
+  background: linear-gradient(180deg, rgba(22, 22, 22, 0.9), rgba(10, 10, 10, 0.92));
+  backdrop-filter: blur(var(--blur-lg)) saturate(135%);
+  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(135%);
+  box-shadow: 0 34px 70px rgba(0, 0, 0, 0.52), var(--inner-shine);
+  overflow-y: auto;
 }
 
 .resources-modal h2 {
-  margin: 0 0 16px 0;
-  font-size: 16px;
+  margin: 0 44px 14px 0;
+  font-family: 'Sora', 'Manrope', sans-serif;
+  font-size: 18px;
   font-weight: 600;
-  color: #fff;
+  letter-spacing: -0.02em;
+  color: var(--text-hi);
 }
 
-.close-button {
+.resources-modal .close-button {
+  appearance: none;
   position: absolute;
-  top: 16px;
-  right: 16px;
-  background: transparent;
-  border: none;
-  color: #666;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 6px;
-  font-size: 18px;
-  line-height: 1;
-  transition: all 0.15s;
-  width: 28px;
-  height: 28px;
-  display: flex;
+  top: 14px;
+  right: 14px;
+  border: 1px solid var(--stroke-soft);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-mid);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  transition: all var(--ease-standard);
 }
 
-.close-button:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+.resources-modal .close-button:hover {
+  color: var(--text-hi);
+  border-color: var(--stroke-strong);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .activities-grid {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
 }
 
 .add-activity-button-container {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .add-activity-button-container button {
-  background: rgba(255, 255, 255, 0.02);
-  backdrop-filter: blur(10px);
-  border: 1px dashed rgba(255, 255, 255, 0.15);
-  color: #777;
-  padding: 12px 16px;
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 14px;
+  appearance: none;
   width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: all 0.15s;
+  border: 1px dashed rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-mid);
+  border-radius: var(--radius-pill);
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: all var(--ease-standard);
 }
 
 .add-activity-button-container button:hover {
-  border-color: rgba(255, 255, 255, 0.25);
-  color: #fff;
-  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-hi);
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.1);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 760px) {
   .resources-modal {
-    max-height: calc(100vh - 80px);
-    border-radius: 24px 24px 0 0;
-    padding: 20px 16px;
-  }
-  
-  .close-button {
-    top: 12px;
-    right: 12px;
+    max-height: calc(100vh - 68px);
+    border-radius: 24px;
+    padding: 14px;
   }
 }

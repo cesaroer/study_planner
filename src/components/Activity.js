@@ -19,7 +19,7 @@ const Activity = ({ activity, onToggle }) => {
 
   return (
     <div 
-      className={`activity ${isBlocked ? 'blocked' : ''}`} 
+      className={`activity ${isBlocked ? 'blocked' : ''} ${activity.completado ? 'completed' : ''}`}
       onClick={handleContainerClick}
       role="button"
       tabIndex={0}

@@ -43,7 +43,7 @@ export default function CalendarModal({ isOpen, onClose, completions }) {
   const zoomFactor = viewMode === 'year' ? 1 : viewMode === 'month' ? 0.5 : 0.3;
   
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay calendar-overlay" onClick={onClose}>
       <div className="calendar-modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Tu progreso</h2>

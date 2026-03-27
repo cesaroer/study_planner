@@ -91,7 +91,7 @@ export default function FrequencyModal({ isOpen, onClose, activities = [], curre
   })();
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay frequency-overlay" onClick={onClose}>
       <div className="frequency-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Estadísticas de Frecuencia</h2>
@@ -99,7 +99,7 @@ export default function FrequencyModal({ isOpen, onClose, activities = [], curre
             <FaTimes />
           </button>
         </div>
-        <div className="modal-content">
+        <div className="frequency-content">
           <div className="frequency-stats">
             <StatCard
               emoji="🏆"
