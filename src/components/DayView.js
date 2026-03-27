@@ -22,6 +22,15 @@ const DayView = ({
   activities,
   onToggle,
   onDayClick,
+  onOpenContextMenu,
+  onActivityDragStart,
+  onActivityDragEnd,
+  onDropOnDay,
+  onDragOverDay,
+  onDragLeaveDay,
+  draggedActivityId = null,
+  isDropTarget = false,
+  isDragSource = false,
   isToday = false,
   isPast = false,
   isFuture = false,
@@ -34,10 +43,28 @@ const DayView = ({
     }
   };
 
+  const handleDragOver = (event) => {
+    if (!onDragOverDay) return;
+    onDragOverDay(day, event);
+  };
+
+  const handleDrop = (event) => {
+    if (!onDropOnDay) return;
+    onDropOnDay(day, event);
+  };
+
+  const handleDragLeave = (event) => {
+    if (!onDragLeaveDay) return;
+    onDragLeaveDay(day, event);
+  };
+
   return (
     <div 
-      className={`day-view ${isToday ? 'today' : ''} ${isPast ? 'past-day' : ''} ${isFuture ? 'future-day' : ''} ${isSelected ? 'selected' : ''}`} 
+      className={`day-view ${isToday ? 'today' : ''} ${isPast ? 'past-day' : ''} ${isFuture ? 'future-day' : ''} ${isSelected ? 'selected' : ''} ${isDropTarget ? 'drop-target' : ''} ${isDragSource ? 'drag-source' : ''}`}
       onClick={handleDayClick}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      onDragLeave={handleDragLeave}
     >
       <h3>
         <span className="day-view-head">{day}</span>
@@ -49,6 +76,10 @@ const DayView = ({
             key={activity.id} 
             activity={activity} 
             onToggle={onToggle} 
+            onOpenContextMenu={onOpenContextMenu}
+            onDragStartActivity={onActivityDragStart}
+            onDragEndActivity={onActivityDragEnd}
+            isDragged={draggedActivityId === activity.id}
           />
         ))}
       </div>
