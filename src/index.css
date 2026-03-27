@@ -1403,10 +1403,56 @@ body {
 }
 
 .progress-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(18, 20, 25, 0.92);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
   margin-bottom: 10px;
   padding: 10px 12px;
+}
+
+.progress-summary p {
+  color: rgba(236, 239, 244, 0.92);
+  font-weight: 600;
+}
+
+.progress-container {
+  flex: 1;
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  position: relative;
+  overflow: visible;
+}
+
+.progress-bar {
+  position: relative;
+  height: 100%;
+  border-radius: inherit;
+  background: #e4e7ed;
+  transition: width 260ms ease;
+}
+
+.progress-bar .progress-text {
+  font-size: 9px;
+  color: #0f1115;
+}
+
+.rocket-emoji {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 15px;
+  line-height: 1;
+  z-index: 10;
+  transition: left 260ms ease;
+  filter: none;
 }
 
 .week-view {
@@ -1653,12 +1699,12 @@ body {
    Header V2 Minimal (Single Hero)
    ============================================ */
 .dashboard-main .week-hero {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.008));
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  padding: 14px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 0;
   margin-bottom: 10px;
 }
 
