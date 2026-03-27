@@ -8,7 +8,7 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   margin: 0;
   padding: 0;
-  background-color: #000000;
+  background-color: #121212;
   color: #ffffff;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -35,7 +35,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 20px 0 16px;
-  border-bottom: 1px solid #1a1a1a;
+  border-bottom: 1px solid #2a2a2a;
   margin-bottom: 24px;
 }
 
@@ -57,7 +57,7 @@ body {
 }
 
 .user-bar button:hover {
-  background: #0a0a0a;
+  background: #1E1E1E;
   color: #fff;
 }
 
@@ -123,7 +123,7 @@ body {
 }
 
 .nav-button:hover {
-  background: #111;
+  background: #1E1E1E;
   color: #fff;
   transform: scale(1.05);
 }
@@ -155,7 +155,7 @@ body {
 }
 
 .icon-button:hover {
-  background: #111;
+  background: #1E1E1E;
   color: #fff;
   transform: translateY(-1px);
 }
@@ -165,7 +165,7 @@ body {
 }
 
 /* ============================================
-   WEEK TABS (Days)
+   WEEK TABS (Days) - Squircle iOS
    ============================================ */
 .week-tabs {
   display: flex;
@@ -176,76 +176,87 @@ body {
 
 .day-tab {
   flex: 1;
-  background: transparent;
-  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(30px) saturate(150%);
+  -webkit-backdrop-filter: blur(30px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 12px 8px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  border-radius: 4px;
-  transition: all 0.15s ease;
+  border-radius: 24px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15),
+              inset 0 1px 1px rgba(255, 255, 255, 0.1);
 }
 
 .day-tab:hover {
-  background: #0a0a0a;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2),
+              inset 0 1px 1px rgba(255, 255, 255, 0.15);
 }
 
 .day-tab.selected {
-  background: #111;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 .day-tab.selected:hover {
-  background: #161616;
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .day-tab:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 .day-name {
   font-size: 10px;
   font-weight: 600;
-  color: #555;
+  color: #888;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .day-tab.selected .day-name {
-  color: #888;
+  color: #ddd;
 }
 
 .day-tab.past .day-name {
-  color: #333;
+  color: #555;
 }
 
 .day-number {
   font-size: 15px;
-  font-weight: 400;
-  color: #666;
+  font-weight: 500;
+  color: #aaa;
   transition: all 0.15s ease;
 }
 
 .day-tab.selected .day-number {
   color: #fff;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .day-tab.past .day-number {
-  color: #444;
+  color: #666;
 }
 
 .day-tab.past {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.02);
+  opacity: 0.7;
 }
 
 .day-tab.past:hover {
-  background: #080808;
+  background: rgba(255, 255, 255, 0.05);
+  opacity: 0.9;
 }
 
 /* ============================================
-   PROGRESS BAR
+   PROGRESS BAR - Squircle iOS
    ============================================ */
 .progress-summary {
   margin-bottom: 24px;
@@ -253,9 +264,13 @@ body {
   align-items: center;
   gap: 16px;
   padding: 14px 16px;
-  background: #0a0a0a;
-  border-radius: 8px;
-  border: 1px solid #111;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(30px) saturate(150%);
+  -webkit-backdrop-filter: blur(30px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 30px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2),
+              inset 0 1px 1px rgba(255, 255, 255, 0.12);
 }
 
 .progress-summary p {
@@ -281,7 +296,7 @@ body {
 .progress-container {
   flex: 1;
   height: 6px;
-  background: #111;
+  background: #1E1E1E;
   border-radius: 3px;
   overflow: visible;
   position: relative;
@@ -380,30 +395,39 @@ body {
   }
 }
 
-/* Day Card */
+/* Day Card - Squircle iOS Style */
 .day-view {
-  background: #0a0a0a;
-  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 30px;
   padding: 16px;
   min-height: 160px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.25s ease;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25),
+              0 2px 8px rgba(0, 0, 0, 0.15),
+              inset 0 1px 1px rgba(255, 255, 255, 0.15);
 }
 
 .day-view:hover {
-  background: #111;
-  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3),
+              0 4px 12px rgba(0, 0, 0, 0.2),
+              inset 0 1px 2px rgba(255, 255, 255, 0.2);
 }
 
 .day-view.selected {
-  background: #111;
-  box-shadow: inset 0 0 0 1px #222;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
 .day-view.today {
-  box-shadow: inset 0 0 0 1px #fff;
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .day-view.past-day {
@@ -421,7 +445,7 @@ body {
   justify-content: space-between;
   margin: 0 0 12px 0;
   padding-bottom: 10px;
-  border-bottom: 1px solid #161616;
+  border-bottom: 1px solid #252525;
   font-size: 12px;
   font-weight: 600;
   color: #888;
@@ -457,14 +481,14 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
-  border-radius: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease;
 }
 
 .activity:hover {
-  background: #0f0f0f;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .activity.blocked {
@@ -474,7 +498,6 @@ body {
 
 .activity.blocked:hover {
   background: transparent;
-  transform: none;
 }
 
 .activity-checkbox {
@@ -510,7 +533,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #111;
+  background: #1E1E1E;
   border-radius: 6px;
   flex-shrink: 0;
 }
@@ -566,14 +589,14 @@ body {
 }
 
 .modal-content {
-  background: #0a0a0a;
+  background: #1E1E1E;
   border-radius: 12px;
   padding: 24px;
   width: 90%;
   max-width: 500px;
   max-height: calc(100vh - 200px);
   overflow-y: auto;
-  border: 1px solid #1a1a1a;
+  border: 1px solid #2a2a2a;
   animation: slideUp 0.2s ease-out;
 }
 
@@ -615,7 +638,7 @@ body {
 
 .modal__close:hover,
 .modal-close-button:hover {
-  background: #111;
+  background: #1E1E1E;
   color: #fff;
 }
 
@@ -635,8 +658,8 @@ body {
 
 .modal__btn,
 .modal-action-button {
-  background: #111;
-  border: 1px solid #222;
+  background: #1E1E1E;
+  border: 1px solid #2a2a2a;
   color: #888;
   padding: 8px 14px;
   border-radius: 6px;
@@ -648,7 +671,7 @@ body {
 
 .modal__btn:hover,
 .modal-action-button:hover {
-  background: #161616;
+  background: #252525;
   color: #fff;
   border-color: #333;
 }
@@ -667,7 +690,7 @@ body {
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
-  background: #111;
+  background: #1E1E1E;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -676,8 +699,8 @@ body {
 
 .modal__item:hover,
 .modal-activity-tile:hover {
-  background: #161616;
-  border-color: #222;
+  background: #252525;
+  border-color: #2a2a2a;
   transform: translateX(2px);
 }
 
@@ -746,8 +769,8 @@ body {
 .modal-notes-textarea {
   width: 100%;
   min-height: 100px;
-  background: #111;
-  border: 1px solid #222;
+  background: #1E1E1E;
+  border: 1px solid #2a2a2a;
   border-radius: 8px;
   padding: 12px;
   color: #fff;
@@ -828,8 +851,8 @@ body {
   width: 100%;
   max-width: 340px;
   padding: 32px;
-  background: #0a0a0a;
-  border: 1px solid #1a1a1a;
+  background: #1E1E1E;
+  border: 1px solid #2a2a2a;
   border-radius: 12px;
 }
 
@@ -864,8 +887,8 @@ body {
 }
 
 .login-field {
-  background: #111;
-  border: 1px solid #1a1a1a;
+  background: #1E1E1E;
+  border: 1px solid #2a2a2a;
   border-radius: 8px;
   padding: 0 14px;
   transition: border-color 0.1s;
@@ -923,8 +946,8 @@ body {
 }
 
 .login-error {
-  background: #111;
-  border: 1px solid #222;
+  background: #1E1E1E;
+  border: 1px solid #2a2a2a;
   color: #888;
   padding: 10px 14px;
   border-radius: 8px;
@@ -945,7 +968,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #222;
+  background: #2a2a2a;
   border-radius: 3px;
 }
 
