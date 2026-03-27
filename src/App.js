@@ -12,7 +12,7 @@ import FrequencyModal from './components/FrequencyModal';
 import SettingsModal from './components/SettingsModal';
 import ResourcesModal from './components/ResourcesModal';
 import { encryptData, decryptData } from './auth/cryptoUtils';
-import { FaThLarge, FaChartLine, FaCalendarAlt, FaBook, FaCog } from 'react-icons/fa';
+import { FaThLarge, FaChartLine, FaCalendarAlt, FaBook, FaCog, FaAngleLeft, FaAngleRight, FaSignOutAlt } from 'react-icons/fa';
 
 // Utilidad simple para generar UUID v4
 function generateUUID() {
@@ -408,6 +408,7 @@ export default function App() {
   const [isResourcesModalOpen, setIsResourcesModalOpen] = useState(false);
   const [customActivities, setCustomActivities] = useState({});
   const [activeSidebarSection, setActiveSidebarSection] = useState('dashboard');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const handleSaveNotes = (dayKey, newNotes) => {
     setNotes(prevNotes => ({ ...prevNotes, [dayKey]: newNotes }));
@@ -754,11 +755,22 @@ export default function App() {
   }
 
   return (
-    <div className="dashboard-shell">
-      <aside className="dashboard-sidebar">
-        <div className="sidebar-brand">
-          <span className="sidebar-brand-dot">◉</span>
-          <span>Studycart</span>
+    <div className={`dashboard-shell ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      <aside className={`dashboard-sidebar ${isSidebarCollapsed ? 'is-collapsed' : ''}`}>
+        <div className="sidebar-head">
+          <div className="sidebar-brand">
+            <span className="sidebar-brand-dot">◉</span>
+            <span className="sidebar-brand-text">Studycart</span>
+          </div>
+          <button
+            className="sidebar-toggle-button"
+            type="button"
+            onClick={() => setIsSidebarCollapsed(prev => !prev)}
+            aria-label={isSidebarCollapsed ? 'Expandir barra lateral' : 'Colapsar barra lateral'}
+            title={isSidebarCollapsed ? 'Expandir' : 'Colapsar'}
+          >
+            {isSidebarCollapsed ? <FaAngleRight /> : <FaAngleLeft />}
+          </button>
         </div>
         <nav className="sidebar-nav">
           <button
@@ -802,28 +814,23 @@ export default function App() {
             <span>Ajustes</span>
           </button>
         </nav>
-        <div className="sidebar-user">{user.username}</div>
+        <div className="sidebar-footer">
+          <div className="sidebar-user">Bienvenido, {user.username}</div>
+          <button className="sidebar-logout-btn" type="button" onClick={handleLogout}>
+            <FaSignOutAlt />
+            <span>Salir</span>
+          </button>
+        </div>
       </aside>
 
       <div className="app dashboard-main">
-        <div className="user-bar">
-          <span>Bienvenido, {user.username}</span>
-          <button onClick={handleLogout}>Salir</button>
-        </div>
-
-        <h1 className="app-title">Agenda de Estudio</h1>
-
         <WeekNavigation
           onPrev={() => navigateWeek('prev')}
           onNext={() => navigateWeek('next')}
           currentWeek={currentWeek}
-          onOpenCalendar={handleOpenCalendar}
-          onOpenFrequency={handleOpenFrequency}
-          onOpenSettings={handleOpenSettings}
-          onOpenResources={handleOpenResources}
           onSelectDate={setSelectedDate}
           selectedDate={selectedDate}
-          showActions={false}
+          activitiesByDay={activitiesByDay}
         />
 
         <div className="progress-summary">

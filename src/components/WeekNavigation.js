@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { FaCalendarAlt, FaChartBar, FaCog, FaChevronLeft, FaChevronRight, FaBook } from 'react-icons/fa';
-import { format, startOfWeek, addDays, parseISO } from 'date-fns';
+import React from 'react';
+import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { format, startOfWeek, addDays, parseISO, differenceInCalendarDays, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getWeekNumber } from './DayView';
 import WeekTabs from './WeekTabs';
@@ -19,95 +19,54 @@ const WeekNavigation = ({
   onPrev,
   onNext,
   currentWeek,
-  onOpenCalendar,
-  onOpenFrequency,
-  onOpenSettings,
-  onOpenResources,
   onSelectDate,
   selectedDate,
-  showActions = true
+  activitiesByDay
 }) => {
   const weekNumber = getWeekNumber(parseISO(currentWeek));
   const { start, end } = getWeekRange(currentWeek);
   const weekRangeString = `${formatDate(start)} - ${formatDate(end)}`;
-  const [localSelectedDate, setLocalSelectedDate] = useState(selectedDate || new Date());
+  const dayNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
-  // Sincronizar con la fecha seleccionada desde las props
-  useEffect(() => {
-    if (selectedDate) {
-      setLocalSelectedDate(selectedDate);
-    }
-  }, [selectedDate]);
+  const weekStart = startOfDay(parseISO(currentWeek));
+  const selectedOffsetRaw = differenceInCalendarDays(startOfDay(selectedDate), weekStart);
+  const selectedOffset = Math.min(6, Math.max(0, selectedOffsetRaw));
+  const selectedDayName = dayNames[selectedOffset];
 
-  const handleDateSelect = (date) => {
-    setLocalSelectedDate(date);
-    if (onSelectDate) onSelectDate(date);
-  };
+  const selectedActivities = Array.isArray(activitiesByDay?.[selectedDayName])
+    ? activitiesByDay[selectedDayName]
+    : [];
+  const selectedTotal = selectedActivities.filter(activity => activity && !activity.bloqueada).length;
+  const selectedCompleted = selectedActivities.filter(
+    activity => activity && !activity.bloqueada && activity.completado
+  ).length;
+  const selectedProgress = selectedTotal > 0 ? Math.round((selectedCompleted / selectedTotal) * 100) : 0;
 
   return (
-    <div className="week-navigation">
-      {showActions && (
-        <div className="action-buttons">
-          <button 
-            className="icon-button" 
-            onClick={onOpenFrequency}
-            title="Ver frecuencias"
-            aria-label="Ver frecuencias"
-          >
-            <FaChartBar />
+    <section className="week-hero" aria-label="Navegación semanal">
+      <div className="week-hero-top">
+        <div className="week-hero-copy">
+          <h2 className="week-hero-day">{selectedDayName}</h2>
+          <p className="week-hero-day-progress">{selectedProgress}% completado</p>
+          <p className="week-hero-week-meta">Semana {weekNumber} · {weekRangeString}</p>
+        </div>
+        <div className="week-hero-controls">
+          <button className="week-hero-arrow" onClick={onPrev} aria-label="Semana anterior">
+            <FaChevronLeft />
           </button>
-          <button 
-            className="icon-button" 
-            onClick={onOpenCalendar}
-            title="Ver calendario"
-            aria-label="Ver calendario"
-          >
-            <FaCalendarAlt />
-          </button>
-          <button
-            className="icon-button"
-            onClick={onOpenResources}
-            title="Recursos"
-            aria-label="Recursos"
-          >
-            <FaBook />
-          </button>
-          <button
-            className="icon-button"
-            onClick={onOpenSettings}
-            title="Ajustes"
-            aria-label="Ajustes"
-          >
-            <FaCog />
+          <button className="week-hero-arrow" onClick={onNext} aria-label="Semana siguiente">
+            <FaChevronRight />
           </button>
         </div>
-      )}
-
-      {/* Segunda fila: Navegación de semana */}
-      <div className="week-header">
-        <button className="nav-button" onClick={onPrev} aria-label="Semana anterior">
-          <FaChevronLeft />
-        </button>
-        <div className="week-title">
-          <h2>
-            <span className="week-number">Semana {weekNumber}</span>
-            <span className="week-range">{weekRangeString}</span>
-          </h2>
-        </div>
-        <button className="nav-button" onClick={onNext} aria-label="Semana siguiente">
-          <FaChevronRight />
-        </button>
       </div>
 
-      {/* Tercera fila: Pestañas de días */}
-      <div className="week-tabs-container">
-        <WeekTabs 
-          currentWeek={currentWeek} 
-          selectedDate={localSelectedDate}
-          onSelectDate={handleDateSelect}
-        />
-      </div>
-    </div>
+      <WeekTabs
+        currentWeek={currentWeek}
+        selectedDate={selectedDate}
+        onSelectDate={onSelectDate}
+        activitiesByDay={activitiesByDay}
+      />
+    </section>
   );
 };
 
