@@ -1,13 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useLocalStorage } from './hooks/useLocalStorage';
 import WeekNavigation from './components/WeekNavigation';
 import DayView from './components/DayView';
-import DayDetailModal from './components/DayDetailModal'; 
+import DayDetailModal from './components/DayDetailModal';
 import { defaultActivities } from './data/defaultActivities';
 import ProgressBar from './components/ProgressBar';
 import { format, startOfWeek, addDays, parseISO, isBefore, startOfDay, differenceInCalendarDays } from 'date-fns';
-import { es } from 'date-fns/locale';
 import CalendarModal from './components/CalendarModal';
 import FrequencyModal from './components/FrequencyModal';
 import SettingsModal from './components/SettingsModal';
@@ -34,7 +32,7 @@ import {
 // Utilidad simple para generar UUID v4
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    const r = (Math.random() * 16) | 0, v = c === 'x' ? r : ((r & 0x3) | 0x8);
     return v.toString(16);
   });
 }
@@ -219,7 +217,7 @@ export default function App() {
 
   const [studyPlans, setStudyPlans] = useState([]);
   const [activePlanId, setActivePlanId] = useState(null);
-  const DAYS_LIST = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+  const DAYS_LIST = useMemo(() => ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'], []);
 
   // Cargar planes de estudio
   useEffect(() => {
@@ -279,7 +277,7 @@ export default function App() {
       setStudyPlans([]);
       setActivePlanId(null);
     }
-  }, [user]);
+  }, [user, DAYS_LIST]);
 
   // Guardar planes automáticamente
   useEffect(() => {
@@ -565,7 +563,7 @@ export default function App() {
       ...prev,
       [currentWeek]: planActivities
     }));
-  }, [activePlanId]);
+  }, [activePlanId, currentWeek, studyPlans, user]);
 
   const currentWeekData = Array.isArray(weeksData[currentWeek]) ? weeksData[currentWeek] : [];
 
@@ -683,8 +681,8 @@ export default function App() {
   };
 
   const progressText = `Progreso: ${completedCount}/${totalCount} actividades ${getProgressBarEmoji(progress)}`;
-  
-  const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+  const days = useMemo(() => ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'], []);
   
   // Create a map to track unique activities by ID
   const uniqueActivitiesMap = new Map();
@@ -1507,8 +1505,7 @@ export default function App() {
 
   useEffect(() => {
     const newCompletions = {};
-    
-    // First, count all activities by date
+
     Object.keys(weeksData).forEach(weekKey => {
       const weekActivities = weeksData[weekKey];
       
