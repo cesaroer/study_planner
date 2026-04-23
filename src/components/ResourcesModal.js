@@ -15,8 +15,8 @@ const ResourcesModal = ({ isOpen, onClose, activities, onAddActivity, theme }) =
   }, []);
 
   return (
-    <div className="modal-overlay">
-      <div className={`modal-content ${theme === 'dark' ? 'dark-mode' : ''}`}>
+    <div className="modal-overlay resources-overlay" onClick={onClose}>
+      <div className={`resources-modal ${theme === 'dark' ? 'dark-mode' : ''}`} onClick={(e) => e.stopPropagation()}>
         <button className="close-button" onClick={onClose}>
           <FaTimes />
         </button>

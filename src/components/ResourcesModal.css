@@ -1,102 +1,87 @@
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.75);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: rgba(32, 34, 37, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #E0E0E0;
-  padding: 24px;
-  border-radius: 16px;
-  width: 90%;
-  max-width: 800px;
-  max-height: 90vh;
-  overflow-y: auto;
+.resources-modal {
+  width: min(640px, 100%);
+  max-height: calc(100vh - 120px);
   position: relative;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  padding: 18px;
+  border-radius: 30px;
+  border: 1px solid var(--stroke-soft);
+  background: linear-gradient(180deg, rgba(22, 22, 22, 0.9), rgba(10, 10, 10, 0.92));
+  backdrop-filter: blur(var(--blur-lg)) saturate(135%);
+  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(135%);
+  box-shadow: 0 34px 70px rgba(0, 0, 0, 0.52), var(--inner-shine);
+  overflow-y: auto;
 }
 
-.close-button:hover {
-  background: rgba(255, 255, 255, 0.1);
+.resources-modal h2 {
+  margin: 0 44px 14px 0;
+  font-family: 'Sora', 'Manrope', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-hi);
 }
 
-h2 {
-  color: #fff;
-  margin-top: 0;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+.resources-modal .close-button {
+  appearance: none;
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  border: 1px solid var(--stroke-soft);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-mid);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--ease-standard);
+}
+
+.resources-modal .close-button:hover {
+  color: var(--text-hi);
+  border-color: var(--stroke-strong);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .activities-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-
-
-.activity:hover {
-  background: rgba(255, 255, 255, 0.1);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-
-
-
-.add-activity-button-container {
   display: flex;
-  justify-content: center;
-  margin-top: 24px;
-}
-
-.add-activity-button-container button {
-  background: rgba(37, 117, 252, 0.2);
-  color: #E0E0E0;
-  border: 1px solid rgba(37, 117, 252, 0.3);
-  border-radius: 8px;
-  padding: 12px 24px;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
 }
 
+.add-activity-button-container {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.add-activity-button-container button {
+  appearance: none;
+  width: 100%;
+  border: 1px dashed rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-mid);
+  border-radius: var(--radius-pill);
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: all var(--ease-standard);
+}
+
 .add-activity-button-container button:hover {
-  background: rgba(37, 117, 252, 0.3);
-  transform: translateY(-1px);
+  color: var(--text-hi);
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.1);
 }
 
-/* Scrollbar styling */
-.modal-content::-webkit-scrollbar {
-  width: 8px;
-}
-
-.modal-content::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
-}
-
-.modal-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-}
-
-.modal-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+@media (max-width: 760px) {
+  .resources-modal {
+    max-height: calc(100vh - 68px);
+    border-radius: 24px;
+    padding: 14px;
+  }
 }

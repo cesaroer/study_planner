@@ -10,8 +10,8 @@ const DayDetailModal = ({ day, activities, notes, onToggleActivity, onSaveNotes,
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay day-detail-overlay" onClick={onClose}>
+      <div className="modal-content day-detail-modal" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close-button" onClick={onClose}>×</button>
         <h2>Actividades para {day}</h2>
         <div className="modal-actions">
