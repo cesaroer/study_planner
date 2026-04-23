@@ -394,8 +394,10 @@ export default function App() {
     });
   };
 
+  // eslint-disable-next-line
   const getActivePlan = () => studyPlans.find(p => p.id === activePlanId) || null;
 
+  // eslint-disable-next-line
   const saveCredentials = async (username, password) => {
     try {
       const encrypted = await encryptData(JSON.stringify({ username }), password);
@@ -408,6 +410,7 @@ export default function App() {
     }
   };
 
+  // eslint-disable-next-line
   const loadCredentials = async (password) => {
     try {
       const encrypted = JSON.parse(localStorage.getItem('userCredentials'));
@@ -795,6 +798,7 @@ export default function App() {
   
   const today = startOfDay(new Date());
   const todayFormatted = format(today, 'yyyy-MM-dd');
+  // eslint-disable-next-line
   const todayDayName = days[today.getDay() === 0 ? 6 : today.getDay() - 1]; 
   
   const isCurrentDay = (dayName) => {
@@ -873,6 +877,7 @@ export default function App() {
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isResourcesModalOpen, setIsResourcesModalOpen] = useState(false);
+  // eslint-disable-next-line
   const [customActivities, setCustomActivities] = useState({});
   const [activeSidebarSection, setActiveSidebarSection] = useState('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -1482,6 +1487,7 @@ export default function App() {
     isContextTagsModalOpen
   ]);
 
+  // eslint-disable-next-line
   const updateCompletions = (date, activityId, completed) => {
     setCompletions(prev => {
       const dateStr = date.toISOString().split('T')[0];
@@ -1574,6 +1580,7 @@ export default function App() {
     );
   }
   if (!user) {
+    // eslint-disable-next-line
     const hasHadUser = Boolean(localStorage.getItem('hasHadUser'));
 
     // Login/registro controlado

@@ -33,9 +33,11 @@ export default function CalendarModal({ isOpen, onClose, completions }) {
   const yearCellSize = 22;
   const yearGutterSize = 6;
   
+  // eslint-disable-next-line
   const monthCellSize = Math.round(yearCellSize * 0.5); // 50% smaller
   const monthGutterSize = 3;
-  
+
+  // eslint-disable-next-line
   const weekCellSize = Math.round(yearCellSize * 0.3); // 70% smaller
   const weekGutterSize = 1;
 

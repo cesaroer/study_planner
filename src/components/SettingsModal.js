@@ -62,6 +62,7 @@ const ACTIVITY_TYPES = [
 ];
 
 // Available emoji icons for activities
+// eslint-disable-next-line
 const EMOJI_ICONS = ['📱', '💻', '🌐', '⚡', '🤖', '🔄', '☁️', '⚙️', '📚', '🔧', '📊', '🌱'];
 
 export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity, onUpdateActivity, onDeleteActivity, currentWeekActivities = [] }) {

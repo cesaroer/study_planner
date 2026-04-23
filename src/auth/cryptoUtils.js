@@ -1,5 +1,3 @@
-import { useState } from 'react';
-
 // Generar salt aleatorio
 export const generateSalt = () => {
   const array = new Uint8Array(16);

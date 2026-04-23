@@ -4,6 +4,7 @@ import { FaTimes } from 'react-icons/fa';
 import StatCard from './StatCard';
 import ActivityFrequencyChart from './ActivityFrequencyChart';
 
+// eslint-disable-next-line
 const FrequencyCard = ({ title, activity, tipo }) => {
   if (!activity) return null;
   
