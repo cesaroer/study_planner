@@ -12,6 +12,7 @@ import CalendarModal from './components/CalendarModal';
 import FrequencyModal from './components/FrequencyModal';
 import SettingsModal from './components/SettingsModal';
 import ResourcesModal from './components/ResourcesModal';
+import WeeklyPlanner from './components/WeeklyPlanner';
 import { encryptData, decryptData } from './auth/cryptoUtils';
 import {
   FaThLarge,
@@ -26,7 +27,8 @@ import {
   FaUndo,
   FaRedo,
   FaTimes,
-  FaSearch
+  FaSearch,
+  FaClipboardList
 } from 'react-icons/fa';
 
 // Utilidad simple para generar UUID v4
@@ -215,6 +217,187 @@ export default function App() {
     }
   }, [weeksData, user]);
 
+  const [studyPlans, setStudyPlans] = useState([]);
+  const [activePlanId, setActivePlanId] = useState(null);
+  const DAYS_LIST = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+  // Cargar planes de estudio
+  useEffect(() => {
+    if (user && user.username) {
+      const key = `studyPlans_${user.username}`;
+      const stored = localStorage.getItem(key);
+      let loadedPlans = [];
+
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          loadedPlans = parsed.plans || [];
+        } catch {}
+      }
+
+      // Garantizar que el plan default de defaultActivities siempre exista
+      const hasDefault = loadedPlans.some(p => p.id === 'plan_default');
+      if (!hasDefault) {
+        const defaultPlanActivities = {};
+        DAYS_LIST.forEach(d => {
+          const dayActs = defaultActivities[d] || [];
+          defaultPlanActivities[d] = dayActs.map(act => ({
+            id: act.id || `def-${d}-${(act.actividad || '').trim().toLowerCase().replace(/\s+/g, '-')}`,
+            actividad: act.actividad || '',
+            tipo: act.tipo || 'estudio',
+            icono: act.icono || '📝',
+            dia: d,
+            completado: false,
+            bloqueada: false,
+            tags: [],
+            targetMinutes: 0,
+            spentMinutes: 0,
+            pomodoroSessions: 0,
+          }));
+        });
+        const defaultPlan = {
+          id: 'plan_default',
+          name: 'Plan default',
+          createdAt: '2025-01-01T00:00:00.000Z',
+          activities: defaultPlanActivities,
+          isDefault: true,
+        };
+        loadedPlans = [defaultPlan, ...loadedPlans];
+      }
+
+      setStudyPlans(loadedPlans);
+
+      const savedActiveId = stored ? (JSON.parse(stored).activePlanId || null) : null;
+      if (savedActiveId && loadedPlans.some(p => p.id === savedActiveId)) {
+        setActivePlanId(savedActiveId);
+      } else if (loadedPlans.length > 0) {
+        setActivePlanId(loadedPlans[0].id);
+      } else {
+        setActivePlanId(null);
+      }
+    } else {
+      setStudyPlans([]);
+      setActivePlanId(null);
+    }
+  }, [user]);
+
+  // Guardar planes automáticamente
+  useEffect(() => {
+    if (user && user.username && studyPlans.length >= 0) {
+      const key = `studyPlans_${user.username}`;
+      localStorage.setItem(key, JSON.stringify({
+        plans: studyPlans,
+        activePlanId,
+      }));
+    }
+  }, [studyPlans, activePlanId, user]);
+
+  // CRUD de planes
+  const handleCreatePlan = (planId, name) => {
+    const emptyActivities = {};
+    DAYS_LIST.forEach(d => { emptyActivities[d] = []; });
+    const newPlan = { id: planId, name, createdAt: new Date().toISOString(), activities: emptyActivities };
+    setStudyPlans(prev => [...prev, newPlan]);
+    setActivePlanId(planId);
+  };
+
+  const handleDeletePlan = (planId) => {
+    if (planId === 'plan_default') return;
+    setStudyPlans(prev => {
+      const updated = prev.filter(p => p.id !== planId);
+      if (activePlanId === planId) {
+        setActivePlanId(updated.length > 0 ? updated[0].id : null);
+      }
+      return updated;
+    });
+  };
+
+  const handleRenamePlan = (planId, newName) => {
+    setStudyPlans(prev => prev.map(p => p.id === planId ? { ...p, name: newName } : p));
+  };
+
+  const handleAddActivityToPlan = (planId, activity) => {
+    setStudyPlans(prev => prev.map(p => {
+      if (p.id !== planId) return p;
+      const dayActivities = p.activities[activity.dia] || [];
+      return {
+        ...p,
+        activities: {
+          ...p.activities,
+          [activity.dia]: [...dayActivities, activity],
+        },
+      };
+    }));
+  };
+
+  const handleDeleteActivityFromPlan = (planId, day, activityId) => {
+    setStudyPlans(prev => prev.map(p => {
+      if (p.id !== planId) return p;
+      return {
+        ...p,
+        activities: {
+          ...p.activities,
+          [day]: (p.activities[day] || []).filter(a => a.id !== activityId),
+        },
+      };
+    }));
+  };
+
+  const handleUpdateActivityInPlan = (planId, updates) => {
+    setStudyPlans(prev => {
+      const plan = prev.find(p => p.id === planId);
+      if (!plan) return prev;
+
+      const newPlans = prev.map(p => {
+        if (p.id !== planId) return p;
+
+        const newActivities = { ...p.activities };
+
+        updates.forEach(({ action, day, activityId, activity }) => {
+          if (action === 'delete') {
+            newActivities[day] = (newActivities[day] || []).filter(a => a.id !== activityId);
+          } else if (action === 'update') {
+            const targetDay = day || activity?.dia;
+            if (!targetDay) return;
+            newActivities[targetDay] = (newActivities[targetDay] || []).map(a =>
+              a.id === activityId ? { ...a, ...activity, id: activityId, dia: targetDay } : a
+            );
+          } else if (action === 'add') {
+            const targetDay = day || activity?.dia;
+            if (!targetDay || !activity) return;
+            const dayActs = newActivities[targetDay] || [];
+            const activityToAdd = { ...activity, dia: targetDay };
+            newActivities[targetDay] = [...dayActs, activityToAdd];
+          }
+        });
+
+        return { ...p, activities: newActivities };
+      });
+
+      return newPlans;
+    });
+  };
+
+  const handleCopyFromPlan = (targetPlanId, sourcePlanId) => {
+    setStudyPlans(prev => {
+      const source = prev.find(p => p.id === sourcePlanId);
+      if (!source) return prev;
+      const copiedActivities = {};
+      DAYS_LIST.forEach(d => {
+        copiedActivities[d] = (source.activities[d] || []).map(act => ({
+          ...act,
+          id: `plan-${d}-${act.actividad.trim().toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
+        }));
+      });
+      return prev.map(p => {
+        if (p.id !== targetPlanId) return p;
+        return { ...p, activities: copiedActivities };
+      });
+    });
+  };
+
+  const getActivePlan = () => studyPlans.find(p => p.id === activePlanId) || null;
+
   const saveCredentials = async (username, password) => {
     try {
       const encrypted = await encryptData(JSON.stringify({ username }), password);
@@ -336,28 +519,53 @@ export default function App() {
         }
       }
       
-      // Si no hay datos guardados, crear actividades por defecto
-      const newWeekActivities = Object.entries(defaultActivities).flatMap(([day, acts]) =>
-        acts.map(act => ({
-          ...act,
-          semana: currentWeek,
-          dia: day,
-          id: `${currentWeek}-${day}-${act.actividad}`.toLowerCase().replace(/\s+/g, '-'),
-          completado: false
-        })).map(normalizeActivity)
-      );
-      
-      // Guardar en localStorage para futuras cargas
-      localStorage.setItem(userWeekStorageKey, JSON.stringify(newWeekActivities));
-      
-      setWeeksData(prev => ({
-        ...prev,
-        [currentWeek]: newWeekActivities
-      }));
+      // Si no hay datos guardados, desplegar plan activo
+      const activePlan = studyPlans.find(p => p.id === activePlanId);
+      if (activePlan && activePlan.activities) {
+        const planActivities = Object.entries(activePlan.activities).flatMap(([day, acts]) =>
+          (Array.isArray(acts) ? acts : []).map(act => ({
+            ...act,
+            semana: currentWeek,
+            dia: day,
+            id: `${currentWeek}-${day}-${act.actividad}`.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
+            completado: false,
+          })).map(normalizeActivity)
+        );
+        
+        localStorage.setItem(userWeekStorageKey, JSON.stringify(planActivities));
+        setWeeksData(prev => ({
+          ...prev,
+          [currentWeek]: planActivities
+        }));
+      }
     };
 
     initializeWeek();
-  }, [currentWeek, weeksData, setWeeksData, user]);
+  }, [currentWeek, weeksData, setWeeksData, user, studyPlans, activePlanId]);
+
+  // Re-desplegar plan activo cuando cambia activePlanId
+  useEffect(() => {
+    if (!user || !user.username || !activePlanId || !currentWeek) return;
+    const activePlan = studyPlans.find(p => p.id === activePlanId);
+    if (!activePlan || !activePlan.activities) return;
+
+    const userWeekStorageKey = `week_${user.username}_${currentWeek}`;
+    const planActivities = Object.entries(activePlan.activities).flatMap(([day, acts]) =>
+      (Array.isArray(acts) ? acts : []).map(act => ({
+        ...act,
+        semana: currentWeek,
+        dia: day,
+        id: `${currentWeek}-${day}-${act.actividad}`.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
+        completado: false,
+      })).map(normalizeActivity)
+    );
+
+    localStorage.setItem(userWeekStorageKey, JSON.stringify(planActivities));
+    setWeeksData(prev => ({
+      ...prev,
+      [currentWeek]: planActivities
+    }));
+  }, [activePlanId]);
 
   const currentWeekData = Array.isArray(weeksData[currentWeek]) ? weeksData[currentWeek] : [];
 
@@ -758,14 +966,12 @@ export default function App() {
   const handleAddActivity = (newActivity, day) => {
     setWeeksDataWithHistory(prevWeeksData => {
       const newWeeksData = { ...prevWeeksData };
-      const weekKey = currentWeek; // Use the current week from state
+      const weekKey = currentWeek;
       
-      // Initialize the week if it doesn't exist
       if (!newWeeksData[weekKey]) {
         newWeeksData[weekKey] = [];
       }
       
-      // Add the new activity with the correct structure
       const activityToAdd = normalizeActivity({
         ...newActivity,
         semana: weekKey,
@@ -774,16 +980,13 @@ export default function App() {
         completado: Boolean(newActivity.completado)
       });
       
-      // Check if activity with same ID already exists
       const existingIndex = newWeeksData[weekKey].findIndex(
         act => act.id === activityToAdd.id
       );
       
       if (existingIndex >= 0) {
-        // Update existing activity
         newWeeksData[weekKey][existingIndex] = activityToAdd;
       } else {
-        // Add new activity
         newWeeksData[weekKey] = [
           ...(newWeeksData[weekKey] || []),
           activityToAdd
@@ -791,6 +994,34 @@ export default function App() {
       }
       
       persistWeekActivities(weekKey, newWeeksData[weekKey] || []);
+
+      // Two-way sync: also add to active plan
+      if (activePlanId) {
+        const planActivity = {
+          id: `plan-${day}-${newActivity.actividad.trim().toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
+          actividad: newActivity.actividad,
+          tipo: newActivity.tipo,
+          icono: newActivity.icono || '📝',
+          dia: day,
+          completado: false,
+          bloqueada: false,
+          tags: newActivity.tags || [],
+          targetMinutes: 0,
+          spentMinutes: 0,
+          pomodoroSessions: 0,
+        };
+        setStudyPlans(prev => prev.map(p => {
+          if (p.id !== activePlanId) return p;
+          const dayActivities = p.activities[day] || [];
+          return {
+            ...p,
+            activities: {
+              ...p.activities,
+              [day]: [...dayActivities, planActivity],
+            },
+          };
+        }));
+      }
       
       return newWeeksData;
     });
@@ -913,21 +1144,10 @@ export default function App() {
 
   const handleContextEditChange = (event) => {
     const { name, value } = event.target;
-    setContextEditForm(prev => {
-      if (name === 'tipo') {
-        const nextTypeIcon = TYPE_ICON_MAP[value] || TYPE_ICON_MAP[ACTIVITY_TYPES[0]];
-        const shouldSyncIcon = !prev.icono || prev.icono === TYPE_ICON_MAP[prev.tipo];
-        return {
-          ...prev,
-          tipo: value,
-          icono: shouldSyncIcon ? nextTypeIcon : prev.icono
-        };
-      }
-      return {
-        ...prev,
-        [name]: value
-      };
-    });
+    setContextEditForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const handleSubmitContextEdit = (event) => {
@@ -1063,6 +1283,14 @@ export default function App() {
   const handleCloseResources = () => {
     setIsResourcesModalOpen(false);
     setActiveSidebarSection('dashboard');
+  };
+
+  const handleOpenPlanner = () => {
+    setActiveSidebarSection('planner');
+    setIsCalendarModalOpen(false);
+    setShowFrequencyModal(false);
+    setShowSettingsModal(false);
+    setIsResourcesModalOpen(false);
   };
 
   const handleSidebarDashboard = () => {
@@ -1444,6 +1672,14 @@ export default function App() {
             <span>Dashboard</span>
           </button>
           <button
+            className={`sidebar-nav-item ${activeSidebarSection === 'planner' ? 'active' : ''}`}
+            type="button"
+            onClick={handleOpenPlanner}
+          >
+            <FaClipboardList />
+            <span>Planificador</span>
+          </button>
+          <button
             className={`sidebar-nav-item ${activeSidebarSection === 'activity' ? 'active' : ''}`}
             type="button"
             onClick={handleOpenFrequency}
@@ -1486,6 +1722,21 @@ export default function App() {
       </aside>
 
       <div className="app dashboard-main">
+        {activeSidebarSection === 'planner' ? (
+          <WeeklyPlanner
+            plans={studyPlans}
+            activePlanId={activePlanId}
+            onSetActivePlan={setActivePlanId}
+            onCreatePlan={handleCreatePlan}
+            onDeletePlan={handleDeletePlan}
+            onRenamePlan={handleRenamePlan}
+            onAddActivity={handleAddActivityToPlan}
+            onDeleteActivity={handleDeleteActivityFromPlan}
+            onUpdateActivity={handleUpdateActivityInPlan}
+            onCopyFromPlan={handleCopyFromPlan}
+          />
+        ) : (
+        <>
         <WeekNavigation
           onPrev={() => navigateWeek('prev')}
           onNext={() => navigateWeek('next')}
@@ -1547,6 +1798,23 @@ export default function App() {
             )}
           </section>
         ) : (
+          studyPlans.length === 0 && currentWeekData.length === 0 ? (
+            <div className="dashboard-empty-plan">
+              <span style={{ fontSize: 32, opacity: 0.4 }}><FaClipboardList /></span>
+              <p>Crea un plan de estudios para empezar a planificar tu semana</p>
+              <button
+                className="planner-btn primary"
+                type="button"
+                onClick={() => {
+                  const newId = `plan_${Date.now()}`;
+                  handleCreatePlan(newId, 'Plan de estudios 1');
+                  setActiveSidebarSection('planner');
+                }}
+              >
+                <FaPlus /> Crear plan de estudios
+              </button>
+            </div>
+          ) : (
           <div className="week-view">
             {days.map((day, index) => {
               const dayDate = addDays(parseISO(currentWeek), index);
@@ -1585,6 +1853,7 @@ export default function App() {
               );
             })}
           </div>
+          )
         )}
 
         {activityContextMenu.open && contextMenuActivity && typeof document !== 'undefined' && createPortal(
@@ -1957,6 +2226,8 @@ export default function App() {
               <button type="submit" className="quick-add-submit">Guardar etiquetas</button>
             </form>
           </div>
+        )}
+        </>
         )}
       </div>
 

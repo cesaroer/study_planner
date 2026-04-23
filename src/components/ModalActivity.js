@@ -1,5 +1,13 @@
 import React from 'react';
 
+const ESTIMATED_TIMES = {
+  'Actividad Principal': '60-90 min',
+  'Secundaria': '40-45 min',
+  'Menor Prioridad': '20-25 min',
+  'Algoritmos': '15-20 min',
+  'Conocimiento Pasivo': '10-15 min',
+};
+
 const ModalActivity = ({ activity, onToggle }) => {
   const handleClick = (e) => {
     e.stopPropagation();
@@ -26,6 +34,9 @@ const ModalActivity = ({ activity, onToggle }) => {
         <span className="modal-activity-title">{activity.actividad}</span>
         <span className="modal-activity-tag">{activity.tipo}</span>
       </div>
+      {ESTIMATED_TIMES[activity.tipo] && (
+        <span className="modal-activity-time">{ESTIMATED_TIMES[activity.tipo]}</span>
+      )}
     </div>
   );
 };

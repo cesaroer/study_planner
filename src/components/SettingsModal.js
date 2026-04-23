@@ -184,6 +184,8 @@ export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity
   };
 
   const handleStartEdit = (activity) => {
+    const idsByDay = activity.idsByDay || {};
+    const sourceIds = Object.values(idsByDay).filter(Boolean);
     setEditingActivityId(activity.key);
     setEditingActivity({
       key: activity.key,
@@ -191,7 +193,11 @@ export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity
       tipo: activity.tipo || 'Algoritmos',
       icono: activity.icono || '📱',
       dias: Array.isArray(activity.dias) ? activity.dias : [],
-      idsByDay: activity.idsByDay || {},
+      idsByDay,
+      sourceIds,
+      originalActividad: activity.actividad || '',
+      originalTipo: activity.tipo || 'Algoritmos',
+      originalIcono: activity.icono || '📱',
       bloqueada: Boolean(activity.bloqueada)
     });
   };
@@ -214,12 +220,38 @@ export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity
       bloqueada: Boolean(editingActivity.bloqueada)
     };
 
-    const existingByDay = editingActivity.idsByDay || {};
-    const existingDays = Object.keys(existingByDay);
+    const previousByDay = editingActivity.idsByDay || {};
+    const sourceIds = new Set(Array.isArray(editingActivity.sourceIds) ? editingActivity.sourceIds : []);
+    const currentByDay = {};
+
+    currentWeekActivities.forEach(activity => {
+      if (!activity || !activity.id || !activity.dia) return;
+      if (sourceIds.has(activity.id)) {
+        currentByDay[activity.dia] = activity.id;
+      }
+    });
+
+    // Fallback: si faltan IDs por día, buscamos por la firma original de la actividad
+    DAYS.forEach(day => {
+      if (currentByDay[day]) return;
+      const fallback = currentWeekActivities.find(activity =>
+        activity &&
+        activity.dia === day &&
+        activity.actividad === editingActivity.originalActividad &&
+        activity.tipo === editingActivity.originalTipo &&
+        (activity.icono || '📱') === (editingActivity.originalIcono || '📱')
+      );
+      if (fallback?.id) {
+        currentByDay[day] = fallback.id;
+      }
+    });
+
+    const allKnownByDay = { ...previousByDay, ...currentByDay };
+    const existingDays = Object.keys(allKnownByDay);
 
     if (onUpdateActivity) {
       desiredDays.forEach(day => {
-        const existingId = existingByDay[day];
+        const existingId = allKnownByDay[day];
         if (existingId) {
           onUpdateActivity(existingId, { ...updates, dia: day });
         } else if (onAddActivity) {
@@ -231,7 +263,10 @@ export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity
     if (onDeleteActivity) {
       existingDays.forEach(day => {
         if (!desiredDays.includes(day)) {
-          onDeleteActivity(existingByDay[day]);
+          const existingId = allKnownByDay[day];
+          if (existingId) {
+            onDeleteActivity(existingId);
+          }
         }
       });
     }
