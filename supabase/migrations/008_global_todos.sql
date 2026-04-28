@@ -16,3 +16,8 @@ CREATE TABLE global_todos (
 
 CREATE INDEX idx_global_todos_user ON global_todos(user_id, created_at DESC);
 CREATE INDEX idx_global_todos_status ON global_todos(user_id, status);
+
+ALTER TABLE global_todos ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "own_global_todos" ON global_todos
+  FOR ALL USING (auth.uid() = user_id);

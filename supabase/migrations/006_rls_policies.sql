@@ -133,8 +133,3 @@ CREATE POLICY "own_act_resources" ON activity_resources
 
 CREATE POLICY "own_sync" ON sync_log
   FOR ALL USING (auth.uid() = user_id);
-
-ALTER TABLE global_todos ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "own_global_todos" ON global_todos
-  FOR ALL USING (auth.uid() = user_id);
