@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import WeekNavigation from './components/WeekNavigation';
 import DayView from './components/DayView';
@@ -10,13 +10,17 @@ import CalendarModal from './components/CalendarModal';
 import FrequencyModal from './components/FrequencyModal';
 import SettingsModal from './components/SettingsModal';
 import ResourcesModal from './components/ResourcesModal';
+import TodoListModal from './components/TodoListModal';
+import TodoListView from './components/TodoListView';
 import WeeklyPlanner from './components/WeeklyPlanner';
+import * as DS from './services/dataService';
 import { encryptData, decryptData } from './auth/cryptoUtils';
 import {
   FaThLarge,
   FaChartLine,
   FaCalendarAlt,
   FaBook,
+  FaListUl,
   FaCog,
   FaAngleLeft,
   FaAngleRight,
@@ -86,6 +90,132 @@ const ACTIVITY_TYPES = [
   'Conocimiento Pasivo'
 ];
 const EMOJI_PRESETS = ['🧠', '📌', '🧩', '🪶', '📘', '💻', '📚', '⚙️', '🚀', '📝', '🎯', '🔥'];
+const GLOBAL_TODO_STORAGE_PREFIX = 'todoList_';
+const LEGACY_ACTIVITY_TODOS_KEY = 'activity_todos';
+const KANBAN_STATUSES = [
+  { key: 'backlog', label: 'Backlog' },
+  { key: 'todo', label: 'To Do' },
+  { key: 'in_progress', label: 'In Progress' },
+  { key: 'done', label: 'Done' },
+];
+const KANBAN_STATUS_LABELS = KANBAN_STATUSES.reduce((acc, status) => {
+  acc[status.key] = status.label;
+  return acc;
+}, {});
+const TODO_PRIORITIES = ['low', 'medium', 'high'];
+const PRIORITY_RANK = { high: 3, medium: 2, low: 1 };
+const ACTIVITY_TYPE_ORDER = {
+  'Algoritmos': 1,
+  'Actividad Principal': 2,
+  'Principal': 2,
+  'Secundaria': 3,
+  'Menor Prioridad': 4,
+  'Menor prioridad': 4,
+  'Conocimiento Pasivo': 5,
+  'Conocimiento pasivo': 5
+};
+const ACTIVITY_TYPE_TO_TODO_PRIORITY = {
+  'Algoritmos': 'high',
+  'Actividad Principal': 'high',
+  'Principal': 'high',
+  'Secundaria': 'medium',
+  'Menor Prioridad': 'low',
+  'Menor prioridad': 'low',
+  'Conocimiento Pasivo': 'low',
+  'Conocimiento pasivo': 'low'
+};
+const DEFAULT_KANBAN_FILTER = {
+  query: '',
+  status: 'all',
+  priority: 'all',
+  tag: '',
+};
+const DEFAULT_KANBAN_SORT = 'manual';
+
+const createLocalTodoId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const getActivityKanbanStatus = (activity) => {
+  if (!activity || typeof activity !== 'object') return 'todo';
+  if (activity.completado) return 'done';
+  return KANBAN_STATUS_LABELS[activity.kanbanStatus] ? activity.kanbanStatus : 'todo';
+};
+
+const getPriorityFromActivityType = (type) => ACTIVITY_TYPE_TO_TODO_PRIORITY[type] || 'medium';
+
+const normalizeGlobalTodo = (todo) => {
+  if (!todo || typeof todo !== 'object') return null;
+  const text = String(todo.text || '').trim();
+  if (!text) return null;
+  const createdAt = todo.createdAt || new Date().toISOString();
+  const normalizedStatus = KANBAN_STATUS_LABELS[todo.status]
+    ? todo.status
+    : (todo.completed ? 'done' : 'todo');
+  const normalizedPriority = TODO_PRIORITIES.includes(todo.priority)
+    ? todo.priority
+    : 'medium';
+  const normalizedTags = Array.isArray(todo.tags)
+    ? [...new Set(todo.tags.map(tag => String(tag || '').trim()).filter(Boolean))]
+    : [];
+  const dueDateValue = typeof todo.dueDate === 'string' && todo.dueDate.trim()
+    ? todo.dueDate.trim()
+    : null;
+  const normalizedDueDate = dueDateValue && !Number.isNaN(Date.parse(dueDateValue))
+    ? dueDateValue
+    : null;
+
+  return {
+    id: String(todo.id || createLocalTodoId()),
+    text,
+    completed: normalizedStatus === 'done',
+    createdAt,
+    updatedAt: todo.updatedAt || createdAt,
+    status: normalizedStatus,
+    description: String(todo.description || '').trim(),
+    priority: normalizedPriority,
+    tags: normalizedTags,
+    dueDate: normalizedDueDate,
+  };
+};
+
+const parseGlobalTodos = (rawValue) => {
+  if (!rawValue) return [];
+  try {
+    const parsed = JSON.parse(rawValue);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map(normalizeGlobalTodo)
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+};
+
+const parseLegacyActivityTodos = () => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LEGACY_ACTIVITY_TODOS_KEY) || '{}');
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+
+    return Object.entries(parsed).reduce((acc, [activityId, todos]) => {
+      if (!Array.isArray(todos)) return acc;
+      const normalizedTodos = todos
+        .filter(todo => todo && typeof todo === 'object')
+        .map(todo => ({
+          id: String(todo.id || createLocalTodoId()),
+          text: String(todo.text || '').trim(),
+          completed: Boolean(todo.completed),
+          createdAt: todo.createdAt || new Date().toISOString()
+        }))
+        .filter(todo => Boolean(todo.text));
+
+      if (normalizedTodos.length > 0) {
+        acc[String(activityId)] = normalizedTodos;
+      }
+      return acc;
+    }, {});
+  } catch {
+    return {};
+  }
+};
 
 export default function App() {
   // ID único de dispositivo confiable
@@ -156,85 +286,210 @@ export default function App() {
     tagsInput: '',
     selectedTags: []
   });
+  const [globalTodos, setGlobalTodos] = useState([]);
+  const [globalTodoInput, setGlobalTodoInput] = useState('');
+  const [globalTodosReady, setGlobalTodosReady] = useState(false);
+  const [activityTodosMap, setActivityTodosMap] = useState({});
+  const [isTodoDetailModalOpen, setIsTodoDetailModalOpen] = useState(false);
+  const [todoDetailActivity, setTodoDetailActivity] = useState(null);
+  const [todoViewMode, setTodoViewMode] = useState('list');
+  const [kanbanFilter, setKanbanFilter] = useState(DEFAULT_KANBAN_FILTER);
+  const [kanbanSort, setKanbanSort] = useState(DEFAULT_KANBAN_SORT);
+  const [isKanbanEditOpen, setIsKanbanEditOpen] = useState(false);
+  const [selectedKanbanTodoId, setSelectedKanbanTodoId] = useState(null);
+  const [kanbanEditDraft, setKanbanEditDraft] = useState({
+    text: '',
+    description: '',
+    priority: 'medium',
+    tagsInput: '',
+    dueDate: '',
+    status: 'todo',
+  });
 
-  // Autologin si el dispositivo es confiable
+  // Autologin desde Supabase session
   useEffect(() => {
-    if (!user) {
-      const username = localStorage.getItem('lastLoggedUsername');
-      if (username) {
-        const trustedKey = `trustedDevices_${username}`;
-        let trusted = [];
-        try {
-          trusted = JSON.parse(localStorage.getItem(trustedKey)) || [];
-        } catch {}
-        if (trusted.includes(deviceId)) {
-          setUser({ username });
+    if (user) { setIsAuthLoading(false); return; }
+    let mounted = true;
+    (async () => {
+      try {
+        const supabase = (await import('./services/supabaseClient')).default;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && mounted) {
+          const email = session.user.email || '';
+          const username = email.replace('@studycart.app', '');
+          setUser({ username, supabaseId: session.user.id });
+        }
+      } catch {}
+      if (mounted) setIsAuthLoading(false);
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const loadWeeksFromDB = useCallback(async () => {
+    if (!user?.username) { setWeeksData({}); return; }
+    try {
+      const dbWeeks = await DS.getWeeksInRange(user.username, '2000-01-01', '2099-12-31');
+      const data = {};
+      for (const w of dbWeeks) {
+        const { all } = await DS.getWeekActivities(w.id);
+        data[w.week_start] = all.map(normalizeActivity);
+      }
+      if (Object.keys(data).length === 0) {
+        const lsKey = `studyPlannerData_${user.username}`;
+        const stored = localStorage.getItem(lsKey);
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            Object.entries(parsed).forEach(([wk, acts]) => { data[wk] = cleanDuplicatedActivities(acts); });
+            if (Object.keys(data).length > 0) {
+              DS.importWeeksFromLocalStorage(data, user.username).catch(() => {});
+            }
+          } catch {}
         }
       }
-      setIsAuthLoading(false);
-    } else {
-      setIsAuthLoading(false);
-    }
-  }, [deviceId, user]);
-
-  // Cargar datos del usuario autenticado
-  useEffect(() => {
-    if (user && user.username) {
-      const key = `studyPlannerData_${user.username}`;
-      const stored = localStorage.getItem(key);
-      
+      setWeeksData(data);
+    } catch (e) {
+      console.error('Error loading weeks from IndexedDB:', e);
+      const lsKey = `studyPlannerData_${user.username}`;
+      const stored = localStorage.getItem(lsKey);
       if (stored) {
-        try {
-          const parsedData = JSON.parse(stored);
-          // Limpiar datos duplicados al cargar
-          const cleanedData = {};
-          Object.entries(parsedData).forEach(([week, activities]) => {
-            cleanedData[week] = cleanDuplicatedActivities(activities);
-          });
-          
-          setWeeksData(cleanedData);
-          // Guardar datos limpios
-          localStorage.setItem(key, JSON.stringify(cleanedData));
-        } catch (e) {
-          console.error('Error al cargar datos del usuario:', e);
-          setWeeksData({});
-        }
-      } else {
-        setWeeksData({});
-      }
-    } else {
-      setWeeksData({});
+        try { setWeeksData(JSON.parse(stored)); } catch { setWeeksData({}); }
+      } else { setWeeksData({}); }
     }
-  }, [user]);
+  }, [user?.username]);
 
-  // Guardar datos automáticamente cuando cambian y hay usuario
+  useEffect(() => { loadWeeksFromDB(); }, [loadWeeksFromDB]);
+
   useEffect(() => {
-    if (user && user.username) {
-      const key = `studyPlannerData_${user.username}`;
-      localStorage.setItem(key, JSON.stringify(weeksData));
+    if (!user?.username || !currentWeek) { setNotes({}); return; }
+    (async () => {
+      try {
+        const week = await DS.getWeek(user.username, currentWeek);
+        if (week) {
+          const noteMap = await DS.getWeekNotes(week.id);
+          setNotes(noteMap);
+        } else {
+          setNotes({});
+        }
+      } catch { setNotes({}); }
+    })();
+  }, [user?.username, currentWeek]);
+
+  const refreshLegacyActivityTodos = async () => {
+    try {
+      const grouped = await DS.getAllTodosGrouped();
+      const map = {};
+      for (const [activityId, todos] of Object.entries(grouped)) {
+        map[activityId] = todos.map(t => ({
+          id: t.id,
+          text: t.text,
+          completed: t.completed,
+          createdAt: t.created_at || t.createdAt,
+        }));
+      }
+      if (Object.keys(map).length === 0) {
+        setActivityTodosMap(parseLegacyActivityTodos());
+      } else {
+        setActivityTodosMap(map);
+      }
+    } catch {
+      setActivityTodosMap(parseLegacyActivityTodos());
     }
-  }, [weeksData, user]);
+  };
+
+  // Cargar todo list global por usuario + legacy activity todos
+  useEffect(() => {
+    if (!user?.username) {
+      setGlobalTodos([]);
+      setGlobalTodoInput('');
+      setGlobalTodosReady(false);
+      setActivityTodosMap({});
+      setTodoViewMode('list');
+      setKanbanFilter(DEFAULT_KANBAN_FILTER);
+      setKanbanSort(DEFAULT_KANBAN_SORT);
+      setIsKanbanEditOpen(false);
+      setSelectedKanbanTodoId(null);
+      return;
+    }
+
+    (async () => {
+      try {
+        let dbTodos = await DS.getGlobalTodos(user.username);
+        if (dbTodos.length === 0) {
+          const todoStorageKey = `${GLOBAL_TODO_STORAGE_PREFIX}${user.username}`;
+          const lsRaw = localStorage.getItem(todoStorageKey);
+          if (lsRaw) {
+            const lsTodos = parseGlobalTodos(lsRaw);
+            if (lsTodos.length > 0) {
+              await DS.importGlobalTodosFromLocalStorage(user.username, lsTodos);
+              dbTodos = await DS.getGlobalTodos(user.username);
+            }
+          }
+        }
+        setGlobalTodos(dbTodos.map(normalizeGlobalTodo).filter(Boolean));
+      } catch {
+        const todoStorageKey = `${GLOBAL_TODO_STORAGE_PREFIX}${user.username}`;
+        setGlobalTodos(parseGlobalTodos(localStorage.getItem(todoStorageKey)));
+      }
+      setGlobalTodosReady(true);
+
+      try {
+        const grouped = await DS.getAllTodosGrouped();
+        const map = {};
+        for (const [activityId, todos] of Object.entries(grouped)) {
+          map[activityId] = todos.map(t => ({
+            id: t.id,
+            text: t.text,
+            completed: t.completed,
+            createdAt: t.created_at || t.createdAt,
+          }));
+        }
+        if (Object.keys(map).length === 0) {
+          const legacy = parseLegacyActivityTodos();
+          setActivityTodosMap(legacy);
+          if (Object.keys(legacy).length > 0) {
+            DS.importTodosFromLocalStorage(legacy).catch(() => {});
+          }
+        } else {
+          setActivityTodosMap(map);
+        }
+      } catch {
+        const legacy = parseLegacyActivityTodos();
+        setActivityTodosMap(legacy);
+        if (Object.keys(legacy).length > 0) {
+          DS.importTodosFromLocalStorage(legacy).catch(() => {});
+        }
+      }
+    })();
+  }, [user?.username]);
+
+  // Persistir global todos a IndexedDB
+  useEffect(() => {
+    if (!user?.username || !globalTodosReady) return;
+    DS.saveGlobalTodos(user.username, globalTodos).catch(() => {});
+  }, [globalTodos, user?.username, globalTodosReady]);
+
+  // Rehidratar summary de activity todos cuando cambia foco de ventana o storage
+  useEffect(() => {
+    const handleRefresh = () => refreshLegacyActivityTodos();
+    window.addEventListener('focus', handleRefresh);
+    window.addEventListener('storage', handleRefresh);
+    return () => {
+      window.removeEventListener('focus', handleRefresh);
+      window.removeEventListener('storage', handleRefresh);
+    };
+  }, []);
 
   const [studyPlans, setStudyPlans] = useState([]);
   const [activePlanId, setActivePlanId] = useState(null);
   const DAYS_LIST = useMemo(() => ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'], []);
 
-  // Cargar planes de estudio
-  useEffect(() => {
-    if (user && user.username) {
-      const key = `studyPlans_${user.username}`;
-      const stored = localStorage.getItem(key);
-      let loadedPlans = [];
-
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          loadedPlans = parsed.plans || [];
-        } catch {}
-      }
-
-      // Garantizar que el plan default de defaultActivities siempre exista
-      const hasDefault = loadedPlans.some(p => p.id === 'plan_default');
+  const loadPlansFromDB = useCallback(async () => {
+    if (!user?.username) { setStudyPlans([]); setActivePlanId(null); return; }
+    try {
+      const dbPlans = await DS.getAllPlans();
+      let plans = dbPlans;
+      const hasDefault = plans.some(p => p.id === 'plan_default');
       if (!hasDefault) {
         const defaultPlanActivities = {};
         DAYS_LIST.forEach(d => {
@@ -253,53 +508,73 @@ export default function App() {
             pomodoroSessions: 0,
           }));
         });
-        const defaultPlan = {
-          id: 'plan_default',
-          name: 'Plan default',
-          createdAt: '2025-01-01T00:00:00.000Z',
-          activities: defaultPlanActivities,
-          isDefault: true,
-        };
-        loadedPlans = [defaultPlan, ...loadedPlans];
+        const defaultPlan = { id: 'plan_default', name: 'Plan default', createdAt: '2025-01-01T00:00:00.000Z', activities: defaultPlanActivities, isDefault: true };
+        await DS.createPlan('Plan default', true, 'plan_default');
+        for (const [dia, acts] of Object.entries(defaultPlanActivities)) {
+          for (const act of acts) {
+            await DS.addPlanActivity('plan_default', { ...act, dia });
+          }
+        }
+        plans = [defaultPlan, ...plans];
       }
 
-      setStudyPlans(loadedPlans);
+      for (const plan of plans) {
+        if (!plan.activities) {
+          plan.activities = await DS.getPlanActivities(plan.id);
+        }
+      }
 
-      const savedActiveId = stored ? (JSON.parse(stored).activePlanId || null) : null;
-      if (savedActiveId && loadedPlans.some(p => p.id === savedActiveId)) {
-        setActivePlanId(savedActiveId);
-      } else if (loadedPlans.length > 0) {
-        setActivePlanId(loadedPlans[0].id);
+      if (plans.length === 0) {
+        const lsKey = `studyPlans_${user.username}`;
+        const stored = localStorage.getItem(lsKey);
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            plans = parsed.plans || [];
+            if (plans.length > 0) {
+              await DS.importPlansFromLocalStorage(plans, parsed.activePlanId, user.username);
+              if (parsed.activePlanId) await DS.setActivePlanId(user.username, parsed.activePlanId);
+            }
+          } catch {}
+        }
+      }
+
+      setStudyPlans(plans);
+      const activeId = await DS.getActivePlanId(user.username);
+      if (activeId && plans.some(p => p.id === activeId)) {
+        setActivePlanId(activeId);
+      } else if (plans.length > 0) {
+        setActivePlanId(plans[0].id);
       } else {
         setActivePlanId(null);
       }
-    } else {
-      setStudyPlans([]);
-      setActivePlanId(null);
+    } catch (e) {
+      console.error('Error loading plans from IndexedDB:', e);
+      const lsKey = `studyPlans_${user.username}`;
+      const stored = localStorage.getItem(lsKey);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          setStudyPlans(parsed.plans || []);
+          setActivePlanId(parsed.activePlanId || null);
+        } catch { setStudyPlans([]); setActivePlanId(null); }
+      } else { setStudyPlans([]); setActivePlanId(null); }
     }
-  }, [user, DAYS_LIST]);
+  }, [user?.username, DAYS_LIST]);
 
-  // Guardar planes automáticamente
-  useEffect(() => {
-    if (user && user.username && studyPlans.length >= 0) {
-      const key = `studyPlans_${user.username}`;
-      localStorage.setItem(key, JSON.stringify({
-        plans: studyPlans,
-        activePlanId,
-      }));
-    }
-  }, [studyPlans, activePlanId, user]);
+  useEffect(() => { loadPlansFromDB(); }, [loadPlansFromDB]);
 
   // CRUD de planes
-  const handleCreatePlan = (planId, name) => {
+  const handleCreatePlan = async (planId, name) => {
     const emptyActivities = {};
     DAYS_LIST.forEach(d => { emptyActivities[d] = []; });
     const newPlan = { id: planId, name, createdAt: new Date().toISOString(), activities: emptyActivities };
     setStudyPlans(prev => [...prev, newPlan]);
     setActivePlanId(planId);
+    try { await DS.createPlan(name, false); await DS.setActivePlanId(user?.username, planId); } catch {}
   };
 
-  const handleDeletePlan = (planId) => {
+  const handleDeletePlan = async (planId) => {
     if (planId === 'plan_default') return;
     setStudyPlans(prev => {
       const updated = prev.filter(p => p.id !== planId);
@@ -308,13 +583,15 @@ export default function App() {
       }
       return updated;
     });
+    try { await DS.deletePlan(planId); } catch {}
   };
 
-  const handleRenamePlan = (planId, newName) => {
+  const handleRenamePlan = async (planId, newName) => {
     setStudyPlans(prev => prev.map(p => p.id === planId ? { ...p, name: newName } : p));
+    try { await DS.updatePlan(planId, { name: newName }); } catch {}
   };
 
-  const handleAddActivityToPlan = (planId, activity) => {
+  const handleAddActivityToPlan = async (planId, activity) => {
     setStudyPlans(prev => prev.map(p => {
       if (p.id !== planId) return p;
       const dayActivities = p.activities[activity.dia] || [];
@@ -326,9 +603,10 @@ export default function App() {
         },
       };
     }));
+    try { await DS.addPlanActivity(planId, activity); } catch {}
   };
 
-  const handleDeleteActivityFromPlan = (planId, day, activityId) => {
+  const handleDeleteActivityFromPlan = async (planId, day, activityId) => {
     setStudyPlans(prev => prev.map(p => {
       if (p.id !== planId) return p;
       return {
@@ -339,9 +617,10 @@ export default function App() {
         },
       };
     }));
+    try { await DS.deletePlanActivity(activityId); } catch {}
   };
 
-  const handleUpdateActivityInPlan = (planId, updates) => {
+  const handleUpdateActivityInPlan = async (planId, updates) => {
     setStudyPlans(prev => {
       const plan = prev.find(p => p.id === planId);
       if (!plan) return prev;
@@ -374,9 +653,16 @@ export default function App() {
 
       return newPlans;
     });
+    try {
+      for (const u of updates) {
+        if (u.action === 'delete') await DS.deletePlanActivity(u.activityId);
+        else if (u.action === 'update') await DS.updatePlanActivity(u.activityId, u.activity || {});
+        else if (u.action === 'add') await DS.addPlanActivity(planId, { ...u.activity, dia: u.day || u.activity?.dia });
+      }
+    } catch {}
   };
 
-  const handleCopyFromPlan = (targetPlanId, sourcePlanId) => {
+  const handleCopyFromPlan = async (targetPlanId, sourcePlanId) => {
     setStudyPlans(prev => {
       const source = prev.find(p => p.id === sourcePlanId);
       if (!source) return prev;
@@ -392,6 +678,7 @@ export default function App() {
         return { ...p, activities: copiedActivities };
       });
     });
+    try { await DS.copyPlanActivities(targetPlanId, sourcePlanId); } catch {}
   };
 
   // eslint-disable-next-line
@@ -425,162 +712,274 @@ export default function App() {
   };
 
   const handleLogin = async (username, mode = 'login') => {
-    // Obtiene la lista de usuarios
-    let userList = [];
+    const email = `${username}@studycart.app`;
+    const password = `${username}_studycart_${username.length}`;
     try {
-      userList = JSON.parse(localStorage.getItem('userList')) || [];
-    } catch {}
-
-    if (mode === 'login') {
-      if (!userList.includes(username)) {
-        setLoginError('Ese usuario no existe. ¿Quieres crear una cuenta?');
-        setAuthMode('register');
-        setPendingUsername(username);
-        return;
+      const supabase = (await import('./services/supabaseClient')).default;
+      if (mode === 'register') {
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) {
+          if (error.message.includes('already registered')) {
+            setLoginError('Ese usuario ya existe. Inicia sesión.');
+            setAuthMode('login');
+          } else {
+            setLoginError(error.message);
+          }
+          return;
+        }
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+          if (error.message.includes('Invalid login')) {
+            setLoginError('Usuario no encontrado. ¿Quieres crear una cuenta?');
+            setAuthMode('register');
+            setPendingUsername(username);
+          } else {
+            setLoginError(error.message);
+          }
+          return;
+        }
       }
-    }
-
-    // Login directo por username
-    if (mode === 'login') {
       setUser({ username });
       setLoginError('');
-      localStorage.setItem('lastLoggedUsername', username);
-      localStorage.setItem('hasHadUser', 'true');
-      // Agregar este dispositivo a la lista de confianza
-      const trustedKey = `trustedDevices_${username}`;
-      let trusted = [];
-      try {
-        trusted = JSON.parse(localStorage.getItem(trustedKey)) || [];
-      } catch {}
-      if (!trusted.includes(deviceId)) {
-        trusted.push(deviceId);
-        localStorage.setItem(trustedKey, JSON.stringify(trusted));
-      }
-    } else {
-      // Crear usuario nuevo
-      localStorage.setItem('lastLoggedUsername', username);
-      localStorage.setItem('hasHadUser', 'true');
-      if (!userList.includes(username)) {
-        userList.push(username);
-        localStorage.setItem('userList', JSON.stringify(userList));
-      }
-      const trustedKey = `trustedDevices_${username}`;
-      localStorage.setItem(trustedKey, JSON.stringify([deviceId]));
-      setUser({ username });
-      setLoginError('');
+    } catch (e) {
+      setLoginError('Error de conexión');
     }
   }; 
 
-  const handleLogout = () => {
-    if (user && user.username) {
-      // Eliminar este dispositivo de la lista de confianza
-      const trustedKey = `trustedDevices_${user.username}`;
-      let trusted = [];
-      try {
-        trusted = JSON.parse(localStorage.getItem(trustedKey)) || [];
-      } catch {}
-      trusted = trusted.filter(id => id !== deviceId);
-      localStorage.setItem(trustedKey, JSON.stringify(trusted));
-    }
-    localStorage.removeItem('userCredentials');
-    localStorage.removeItem('lastLoggedUsername');
+  const handleLogout = async () => {
+    try {
+      const supabase = (await import('./services/supabaseClient')).default;
+      await supabase.auth.signOut();
+    } catch {}
     setUser(null);
   };
 
 
   useEffect(() => {
-    const initializeWeek = () => {
-      // No inicializar semanas si no hay usuario
-      if (!user || !user.username) return;
-
-      // Inicializar solo si la semana no existe o está vacía
+    const initializeWeek = async () => {
+      if (!user?.username) return;
       if (weeksData[currentWeek] && weeksData[currentWeek].length > 0) return;
-      
-      console.log(`Inicializando semana: ${currentWeek}`);
-      
-      // Verificar si ya hay actividades para esta semana en localStorage
-      const userWeekStorageKey = `week_${user.username}_${currentWeek}`;
-      const legacyWeekStorageKey = `week_${currentWeek}`;
-      const storedWeekData =
-        localStorage.getItem(userWeekStorageKey) ?? localStorage.getItem(legacyWeekStorageKey);
-      
-      if (storedWeekData) {
-        // Si hay datos guardados, usarlos
-        try {
-          const parsedData = cleanDuplicatedActivities(JSON.parse(storedWeekData));
-          setWeeksData(prev => ({
-            ...prev,
-            [currentWeek]: parsedData
-          }));
-          // Migrar/asegurar guardado por usuario
-          localStorage.setItem(userWeekStorageKey, JSON.stringify(parsedData));
-          return;
-        } catch (e) {
-          console.error('Error al cargar datos de la semana:', e);
+      try {
+        const week = await DS.getWeek(user.username, currentWeek);
+        if (week) {
+          const { all } = await DS.getWeekActivities(week.id);
+          if (all.length > 0) {
+            setWeeksData(prev => ({ ...prev, [currentWeek]: all.map(normalizeActivity) }));
+            return;
+          }
         }
-      }
-      
-      // Si no hay datos guardados, desplegar plan activo
-      const activePlan = studyPlans.find(p => p.id === activePlanId);
-      if (activePlan && activePlan.activities) {
-        const planActivities = Object.entries(activePlan.activities).flatMap(([day, acts]) =>
-          (Array.isArray(acts) ? acts : []).map(act => ({
-            ...act,
-            semana: currentWeek,
-            dia: day,
-            id: `${currentWeek}-${day}-${act.actividad}`.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
-            completado: false,
-          })).map(normalizeActivity)
-        );
-        
-        localStorage.setItem(userWeekStorageKey, JSON.stringify(planActivities));
-        setWeeksData(prev => ({
-          ...prev,
-          [currentWeek]: planActivities
-        }));
-      }
+        const activePlan = studyPlans.find(p => p.id === activePlanId);
+        if (activePlan?.activities) {
+          const planActivities = Object.entries(activePlan.activities).flatMap(([day, acts]) =>
+            (Array.isArray(acts) ? acts : []).map(act => ({
+              ...act, semana: currentWeek, dia: day,
+              id: `${currentWeek}-${day}-${act.actividad}`.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
+              completado: false,
+            })).map(normalizeActivity)
+          );
+          await DS.deployPlanToWeek(user.username, currentWeek, activePlanId);
+          setWeeksData(prev => ({ ...prev, [currentWeek]: planActivities }));
+        }
+      } catch { console.error('Error initializing week'); }
     };
-
     initializeWeek();
   }, [currentWeek, weeksData, setWeeksData, user, studyPlans, activePlanId]);
 
-  // Re-desplegar plan activo cuando cambia activePlanId
   useEffect(() => {
-    if (!user || !user.username || !activePlanId || !currentWeek) return;
+    if (!user?.username || !activePlanId || !currentWeek) return;
     const activePlan = studyPlans.find(p => p.id === activePlanId);
-    if (!activePlan || !activePlan.activities) return;
-
-    const userWeekStorageKey = `week_${user.username}_${currentWeek}`;
+    if (!activePlan?.activities) return;
     const planActivities = Object.entries(activePlan.activities).flatMap(([day, acts]) =>
       (Array.isArray(acts) ? acts : []).map(act => ({
-        ...act,
-        semana: currentWeek,
-        dia: day,
+        ...act, semana: currentWeek, dia: day,
         id: `${currentWeek}-${day}-${act.actividad}`.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
         completado: false,
       })).map(normalizeActivity)
     );
-
-    localStorage.setItem(userWeekStorageKey, JSON.stringify(planActivities));
-    setWeeksData(prev => ({
-      ...prev,
-      [currentWeek]: planActivities
-    }));
+    DS.deployPlanToWeek(user.username, currentWeek, activePlanId).catch(() => {});
+    setWeeksData(prev => ({ ...prev, [currentWeek]: planActivities }));
   }, [activePlanId, currentWeek, studyPlans, user]);
 
-  const currentWeekData = Array.isArray(weeksData[currentWeek]) ? weeksData[currentWeek] : [];
+  const currentWeekData = useMemo(
+    () => (Array.isArray(weeksData[currentWeek]) ? weeksData[currentWeek] : []),
+    [weeksData, currentWeek]
+  );
 
   const allActivities = Object.values(weeksData).flat();
+  const globalTodoTotalCount = globalTodos.length;
+  const globalTodoRemainingCount = globalTodos.filter(todo => !todo.completed).length;
+
+  const activitiesById = useMemo(() => {
+    const map = new Map();
+    allActivities.forEach(activity => {
+      if (activity?.id && !map.has(activity.id)) {
+        map.set(activity.id, activity);
+      }
+    });
+    return map;
+  }, [allActivities]);
+
+  const activityTodoSummaries = useMemo(() => {
+    return Object.entries(activityTodosMap)
+      .map(([activityId, todos]) => {
+        const todoList = Array.isArray(todos) ? todos : [];
+        if (todoList.length === 0) return null;
+
+        const total = todoList.length;
+        const completed = todoList.filter(todo => Boolean(todo?.completed)).length;
+        const pending = total - completed;
+        const activityReference = activitiesById.get(activityId);
+
+        return {
+          activityId,
+          total,
+          completed,
+          pending,
+          activity: activityReference || {
+            id: activityId,
+            actividad: 'Actividad sin referencia',
+            tipo: 'Sin tipo',
+            icono: '📝'
+          }
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        const aHasPending = a.pending > 0 ? 1 : 0;
+        const bHasPending = b.pending > 0 ? 1 : 0;
+        if (aHasPending !== bHasPending) return bHasPending - aHasPending;
+        if (a.total !== b.total) return b.total - a.total;
+        return (a.activity?.actividad || '').localeCompare(b.activity?.actividad || '');
+      });
+  }, [activityTodosMap, activitiesById]);
+
+  const realToday = startOfDay(new Date());
+  const realWeekStart = format(startOfWeek(realToday, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+  const todayDayNameForKanban = DAYS_LIST[realToday.getDay() === 0 ? 6 : realToday.getDay() - 1];
+  const isViewingCurrentWeek = currentWeek === realWeekStart;
+
+  const kanbanActivityCards = useMemo(() => {
+    if (!isViewingCurrentWeek) return [];
+
+    const seenActivityIds = new Set();
+    return (currentWeekData || [])
+      .filter(activity => {
+        if (!activity?.id || seenActivityIds.has(activity.id)) return false;
+        seenActivityIds.add(activity.id);
+        return activity.dia === todayDayNameForKanban && !activity.bloqueada;
+      })
+      .sort((a, b) => {
+        const pa = ACTIVITY_TYPE_ORDER[a?.tipo] ?? 999;
+        const pb = ACTIVITY_TYPE_ORDER[b?.tipo] ?? 999;
+        if (pa !== pb) return pa - pb;
+        return (a?.actividad || '').localeCompare(b?.actividad || '');
+      })
+      .map(activity => {
+        const status = getActivityKanbanStatus(activity);
+        return {
+          id: `activity:${activity.id}`,
+          source: 'activity',
+          sourceId: activity.id,
+          text: activity.actividad || 'Actividad',
+          description: activity.tipo || '',
+          priority: getPriorityFromActivityType(activity.tipo),
+          tags: Array.isArray(activity.tags) ? activity.tags : [],
+          dueDate: null,
+          status,
+          completed: status === 'done',
+          icono: activity.icono || TYPE_ICON_MAP[activity.tipo] || '📝',
+          activityType: activity.tipo || '',
+          createdAt: activity.createdAt || activity.created_at || '',
+          updatedAt: activity.updatedAt || activity.updated_at || ''
+        };
+      });
+  }, [currentWeekData, isViewingCurrentWeek, todayDayNameForKanban]);
+
+  const kanbanGlobalCards = useMemo(() => {
+    return globalTodos.map(todo => ({
+      ...todo,
+      id: `global:${todo.id}`,
+      source: 'global',
+      sourceId: todo.id
+    }));
+  }, [globalTodos]);
+
+  const kanbanFilteredCards = useMemo(() => {
+    const normalizedQuery = kanbanFilter.query.trim().toLowerCase();
+    const normalizedTag = kanbanFilter.tag.trim().toLowerCase();
+
+    const baseItems = [...kanbanActivityCards, ...kanbanGlobalCards];
+
+    const filtered = baseItems.filter(item => {
+      if (!item) return false;
+
+      const matchesStatus = kanbanFilter.status === 'all' || item.status === kanbanFilter.status;
+      const matchesPriority = kanbanFilter.priority === 'all' || item.priority === kanbanFilter.priority;
+      const tags = Array.isArray(item.tags) ? item.tags : [];
+
+      const matchesTag = !normalizedTag || tags.some(tag => tag.toLowerCase().includes(normalizedTag));
+      const haystack = [
+        item.text,
+        item.description,
+        ...tags,
+        item.activityType || '',
+        KANBAN_STATUS_LABELS[item.status] || '',
+        item.source === 'activity' ? 'actividad planner' : 'todo global'
+      ].join(' ').toLowerCase();
+      const matchesQuery = !normalizedQuery || haystack.includes(normalizedQuery);
+
+      return matchesStatus && matchesPriority && matchesTag && matchesQuery;
+    });
+
+    if (kanbanSort === 'manual') {
+      return filtered;
+    }
+
+    const sorted = [...filtered];
+    sorted.sort((a, b) => {
+      if (kanbanSort === 'updatedAt') {
+        return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime();
+      }
+      if (kanbanSort === 'createdAt') {
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      }
+      if (kanbanSort === 'dueDate') {
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      }
+      if (kanbanSort === 'priority') {
+        return (PRIORITY_RANK[b.priority] || 0) - (PRIORITY_RANK[a.priority] || 0);
+      }
+      return 0;
+    });
+    return sorted;
+  }, [kanbanActivityCards, kanbanGlobalCards, kanbanFilter, kanbanSort]);
+
+  const kanbanColumns = useMemo(() => {
+    return KANBAN_STATUSES.reduce((acc, status) => {
+      acc[status.key] = kanbanFilteredCards.filter(item => item.status === status.key);
+      return acc;
+    }, {});
+  }, [kanbanFilteredCards]);
+
+  const kanbanContextNotice = isViewingCurrentWeek
+    ? ''
+    : 'Estás viendo una semana distinta. Vuelve a la semana actual para ver actividades de hoy en el Kanban.';
 
   const cloneWeeksData = (data) => JSON.parse(JSON.stringify(data || {}));
 
-  const persistWeekActivities = (weekKey, activities) => {
-    if (!weekKey) return;
-    if (user && user.username) {
-      localStorage.setItem(`week_${user.username}_${weekKey}`, JSON.stringify(activities || []));
-    } else {
-      localStorage.setItem(`week_${weekKey}`, JSON.stringify(activities || []));
-    }
+  const persistWeekActivities = async (weekKey, activities) => {
+    if (!weekKey || !user?.username) return;
+    try {
+      let week = await DS.getWeek(user.username, weekKey);
+      if (!week) week = await DS.getOrCreateWeek(user.username, weekKey, activePlanId);
+      for (const a of (activities || [])) {
+        await DS.updateWeekActivity(a.id, { ...a, week_id: week.id, semana: weekKey });
+      }
+    } catch {}
   };
 
   const setWeeksDataWithHistory = (updater) => {
@@ -712,25 +1111,13 @@ export default function App() {
     return acc;
   }, {});
 
-  // Ordenar actividades dentro de cada día por prioridad de tipo
-  const TYPE_PRIORITY = {
-    'Algoritmos': 1,
-    'Actividad Principal': 2,
-    'Principal': 2,
-    'Secundaria': 3,
-    'Menor Prioridad': 4,
-    'Menor prioridad': 4,
-    'Conocimiento Pasivo': 5,
-    'Conocimiento pasivo': 5
-  };
-
   Object.keys(activitiesByDay).forEach(day => {
     activitiesByDay[day] = (activitiesByDay[day] || []).slice().sort((a, b) => {
       const ba = Boolean(a?.bloqueada);
       const bb = Boolean(b?.bloqueada);
       if (ba !== bb) return ba ? 1 : -1; // bloqueadas siempre al final
-      const pa = TYPE_PRIORITY[a?.tipo] ?? 999;
-      const pb = TYPE_PRIORITY[b?.tipo] ?? 999;
+      const pa = ACTIVITY_TYPE_ORDER[a?.tipo] ?? 999;
+      const pb = ACTIVITY_TYPE_ORDER[b?.tipo] ?? 999;
       if (pa !== pb) return pa - pb;
       // Desempate estable: por nombre (si existe)
       const na = (a?.actividad || '').toString();
@@ -884,6 +1271,11 @@ export default function App() {
 
   const handleSaveNotes = (dayKey, newNotes) => {
     setNotes(prevNotes => ({ ...prevNotes, [dayKey]: newNotes }));
+    if (user?.username && currentWeek) {
+      DS.getWeek(user.username, currentWeek).then(week => {
+        if (week) DS.saveWeekNote(week.id, dayKey, newNotes).catch(() => {});
+      });
+    }
   };
 
   const handleCheckAll = (dayKey) => {
@@ -937,12 +1329,16 @@ export default function App() {
     setShowFrequencyModal(false);
     setShowSettingsModal(false);
     setIsResourcesModalOpen(false);
+    setIsTodoDetailModalOpen(false);
+    setTodoDetailActivity(null);
     setIsCalendarModalOpen(true);
   };
 
   const handleCloseCalendar = () => {
     setIsCalendarModalOpen(false);
     setActiveSidebarSection('dashboard');
+    setIsTodoDetailModalOpen(false);
+    setTodoDetailActivity(null);
   };
 
   const handleOpenFrequency = () => {
@@ -950,12 +1346,16 @@ export default function App() {
     setIsCalendarModalOpen(false);
     setShowSettingsModal(false);
     setIsResourcesModalOpen(false);
+    setIsTodoDetailModalOpen(false);
+    setTodoDetailActivity(null);
     setShowFrequencyModal(true);
   };
 
   const handleCloseFrequency = () => {
     setShowFrequencyModal(false);
     setActiveSidebarSection('dashboard');
+    setIsTodoDetailModalOpen(false);
+    setTodoDetailActivity(null);
   };
 
   const handleOpenSettings = () => {
@@ -963,6 +1363,8 @@ export default function App() {
     setIsCalendarModalOpen(false);
     setShowFrequencyModal(false);
     setIsResourcesModalOpen(false);
+    setIsTodoDetailModalOpen(false);
+    setTodoDetailActivity(null);
     setShowSettingsModal(true);
   };
 
@@ -1273,6 +1675,8 @@ export default function App() {
   const handleCloseSettings = () => {
     setShowSettingsModal(false);
     setActiveSidebarSection('dashboard');
+    setIsTodoDetailModalOpen(false);
+    setTodoDetailActivity(null);
   };
 
   const handleOpenResources = () => {
@@ -1280,12 +1684,16 @@ export default function App() {
     setIsCalendarModalOpen(false);
     setShowFrequencyModal(false);
     setShowSettingsModal(false);
+    setIsTodoDetailModalOpen(false);
+    setTodoDetailActivity(null);
     setIsResourcesModalOpen(true);
   };
 
   const handleCloseResources = () => {
     setIsResourcesModalOpen(false);
     setActiveSidebarSection('dashboard');
+    setIsTodoDetailModalOpen(false);
+    setTodoDetailActivity(null);
   };
 
   const handleOpenPlanner = () => {
@@ -1294,6 +1702,8 @@ export default function App() {
     setShowFrequencyModal(false);
     setShowSettingsModal(false);
     setIsResourcesModalOpen(false);
+    setIsTodoDetailModalOpen(false);
+    setTodoDetailActivity(null);
   };
 
   const handleSidebarDashboard = () => {
@@ -1302,6 +1712,297 @@ export default function App() {
     setShowFrequencyModal(false);
     setShowSettingsModal(false);
     setIsResourcesModalOpen(false);
+    setIsTodoDetailModalOpen(false);
+    setTodoDetailActivity(null);
+  };
+
+  const handleOpenTodos = () => {
+    setActiveSidebarSection('todos');
+    setIsCalendarModalOpen(false);
+    setShowFrequencyModal(false);
+    setShowSettingsModal(false);
+    setIsResourcesModalOpen(false);
+    setIsModalOpen(false);
+    setSelectedDay(null);
+    setIsFilterModalOpen(false);
+    setIsQuickAddOpen(false);
+    closeActivityContextMenu();
+    refreshLegacyActivityTodos();
+  };
+
+  const openKanbanTodoEditor = (todo) => {
+    if (!todo?.id) return;
+    const tags = Array.isArray(todo.tags) ? todo.tags : [];
+    setSelectedKanbanTodoId(todo.id);
+    setKanbanEditDraft({
+      text: todo.text || '',
+      description: todo.description || '',
+      priority: TODO_PRIORITIES.includes(todo.priority) ? todo.priority : 'medium',
+      tagsInput: tags.join(', '),
+      dueDate: todo.dueDate || '',
+      status: KANBAN_STATUS_LABELS[todo.status] ? todo.status : 'todo',
+    });
+    setIsKanbanEditOpen(true);
+  };
+
+  const handleGlobalTodoInputChange = (event) => {
+    setGlobalTodoInput(event.target.value);
+  };
+
+  const handleAddGlobalTodo = (event) => {
+    event.preventDefault();
+    const text = globalTodoInput.trim();
+    if (!text) return;
+
+    const now = new Date().toISOString();
+    const nextTodo = normalizeGlobalTodo({
+      id: createLocalTodoId(),
+      text,
+      completed: false,
+      status: 'todo',
+      description: '',
+      priority: 'medium',
+      tags: [],
+      dueDate: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    if (!nextTodo) return;
+    setGlobalTodos(prev => [nextTodo, ...prev]);
+    setGlobalTodoInput('');
+  };
+
+  const handleToggleGlobalTodo = (todoId) => {
+    setGlobalTodos(prev => prev.map(todo => (
+      todo.id === todoId
+        ? {
+            ...todo,
+            completed: !todo.completed,
+            status: !todo.completed ? 'done' : (todo.status === 'done' ? 'todo' : todo.status),
+            updatedAt: new Date().toISOString()
+          }
+        : todo
+    )));
+  };
+
+  const handleDeleteGlobalTodo = (todoId) => {
+    setGlobalTodos(prev => prev.filter(todo => todo.id !== todoId));
+    if (selectedKanbanTodoId === todoId) {
+      setIsKanbanEditOpen(false);
+      setSelectedKanbanTodoId(null);
+    }
+  };
+
+  const handleTodoViewModeChange = (mode) => {
+    if (mode !== 'list' && mode !== 'kanban') return;
+    setTodoViewMode(mode);
+  };
+
+  const handleKanbanFilterChange = (patch) => {
+    setKanbanFilter(prev => ({
+      ...prev,
+      ...patch,
+    }));
+  };
+
+  const handleKanbanSortChange = (nextSort) => {
+    setKanbanSort(nextSort || DEFAULT_KANBAN_SORT);
+  };
+
+  const handleCreateKanbanTodo = (status) => {
+    const normalizedStatus = KANBAN_STATUS_LABELS[status] ? status : 'todo';
+    const now = new Date().toISOString();
+    const createdTodo = normalizeGlobalTodo({
+      id: createLocalTodoId(),
+      text: 'Nueva tarea',
+      status: normalizedStatus,
+      completed: normalizedStatus === 'done',
+      description: '',
+      priority: 'medium',
+      tags: [],
+      dueDate: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    if (!createdTodo) return;
+    setGlobalTodos(prev => [createdTodo, ...prev]);
+    openKanbanTodoEditor(createdTodo);
+  };
+
+  const handleOpenKanbanEdit = (card) => {
+    const source = card?.source || 'global';
+    const sourceId = card?.sourceId || card?.id || card;
+    if (source !== 'global' || !sourceId) return;
+
+    const target = globalTodos.find(todo => todo.id === sourceId);
+    if (!target) return;
+    openKanbanTodoEditor(target);
+  };
+
+  const handleCloseKanbanEdit = () => {
+    setIsKanbanEditOpen(false);
+    setSelectedKanbanTodoId(null);
+  };
+
+  const handleKanbanEditDraftChange = ({ name, value }) => {
+    setKanbanEditDraft(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleKanbanEditTagsChange = (value) => {
+    setKanbanEditDraft(prev => ({
+      ...prev,
+      tagsInput: value
+    }));
+  };
+
+  const handleSaveKanbanEdit = (event) => {
+    event.preventDefault();
+    if (!selectedKanbanTodoId) return;
+
+    const nextText = kanbanEditDraft.text.trim();
+    if (!nextText) return;
+
+    const parsedTags = kanbanEditDraft.tagsInput
+      .split(',')
+      .map(tag => tag.trim())
+      .filter(Boolean);
+    const uniqueTags = [...new Set(parsedTags)];
+
+    const nextStatus = KANBAN_STATUS_LABELS[kanbanEditDraft.status]
+      ? kanbanEditDraft.status
+      : 'todo';
+    const nextPriority = TODO_PRIORITIES.includes(kanbanEditDraft.priority)
+      ? kanbanEditDraft.priority
+      : 'medium';
+    const nextDueDate = kanbanEditDraft.dueDate && !Number.isNaN(Date.parse(kanbanEditDraft.dueDate))
+      ? kanbanEditDraft.dueDate
+      : null;
+
+    setGlobalTodos(prev => prev.map(todo => (
+      todo.id === selectedKanbanTodoId
+        ? normalizeGlobalTodo({
+            ...todo,
+            text: nextText,
+            description: kanbanEditDraft.description.trim(),
+            priority: nextPriority,
+            tags: uniqueTags,
+            dueDate: nextDueDate,
+            status: nextStatus,
+            completed: nextStatus === 'done',
+            updatedAt: new Date().toISOString()
+          }) || todo
+        : todo
+    )));
+
+    handleCloseKanbanEdit();
+  };
+
+  const handleDeleteKanbanTodo = () => {
+    if (!selectedKanbanTodoId) return;
+    setGlobalTodos(prev => prev.filter(todo => todo.id !== selectedKanbanTodoId));
+    handleCloseKanbanEdit();
+  };
+
+  const handleMoveKanbanTodo = (payload) => {
+    const source = payload?.source;
+    const sourceId = payload?.sourceId;
+    const targetStatus = payload?.targetStatus;
+    const targetCardId = payload?.targetCardId || null;
+
+    if (!source || !sourceId || !KANBAN_STATUS_LABELS[targetStatus]) return;
+
+    if (source === 'activity') {
+      setWeeksDataWithHistory(prevWeeksData => {
+        const weekActivities = Array.isArray(prevWeeksData[currentWeek]) ? prevWeeksData[currentWeek] : [];
+        let hasChanges = false;
+
+        const updatedActivities = weekActivities.map(activity => {
+          if (activity.id !== sourceId || activity.bloqueada) {
+            return normalizeActivity(activity);
+          }
+
+          hasChanges = true;
+          return normalizeActivity({
+            ...activity,
+            kanbanStatus: targetStatus,
+            completado: targetStatus === 'done'
+          });
+        });
+
+        if (!hasChanges) return prevWeeksData;
+
+        const nextWeeksData = {
+          ...prevWeeksData,
+          [currentWeek]: updatedActivities
+        };
+
+        persistWeekActivities(currentWeek, updatedActivities);
+        return nextWeeksData;
+      });
+      return;
+    }
+
+    if (source !== 'global') return;
+
+    setGlobalTodos(prev => {
+      const sourceIndex = prev.findIndex(todo => todo.id === sourceId);
+      if (sourceIndex === -1) return prev;
+
+      const movedBase = prev[sourceIndex];
+      const updatedMovedTodo = normalizeGlobalTodo({
+        ...movedBase,
+        status: targetStatus,
+        completed: targetStatus === 'done',
+        updatedAt: new Date().toISOString()
+      });
+      if (!updatedMovedTodo) return prev;
+
+      if (kanbanSort !== 'manual') {
+        return prev.map(todo => (todo.id === sourceId ? updatedMovedTodo : todo));
+      }
+
+      const targetGlobalId = typeof targetCardId === 'string' && targetCardId.startsWith('global:')
+        ? targetCardId.replace('global:', '')
+        : null;
+
+      const listWithoutMoved = prev.filter(todo => todo.id !== sourceId);
+      let insertionIndex = listWithoutMoved.length;
+
+      if (targetGlobalId) {
+        const targetIndex = listWithoutMoved.findIndex(todo => todo.id === targetGlobalId);
+        if (targetIndex >= 0) {
+          insertionIndex = targetIndex;
+        }
+      } else {
+        for (let index = listWithoutMoved.length - 1; index >= 0; index -= 1) {
+          if (listWithoutMoved[index].status === targetStatus) {
+            insertionIndex = index + 1;
+            break;
+          }
+        }
+      }
+
+      const nextTodos = [...listWithoutMoved];
+      nextTodos.splice(insertionIndex, 0, updatedMovedTodo);
+      return nextTodos;
+    });
+  };
+
+  const handleOpenActivityTodoDetail = (activity) => {
+    if (!activity?.id) return;
+    setTodoDetailActivity(activity);
+    setIsTodoDetailModalOpen(true);
+  };
+
+  const handleCloseTodoDetailModal = () => {
+    setIsTodoDetailModalOpen(false);
+    setTodoDetailActivity(null);
+    refreshLegacyActivityTodos();
   };
 
   const toggleTagFilter = (tag) => {
@@ -1471,7 +2172,9 @@ export default function App() {
       isResourcesModalOpen ||
       isModalOpen ||
       isContextEditModalOpen ||
-      isContextTagsModalOpen
+      isContextTagsModalOpen ||
+      isTodoDetailModalOpen ||
+      isKanbanEditOpen
     ) {
       closeActivityContextMenu();
     }
@@ -1484,8 +2187,24 @@ export default function App() {
     isResourcesModalOpen,
     isModalOpen,
     isContextEditModalOpen,
-    isContextTagsModalOpen
+    isContextTagsModalOpen,
+    isTodoDetailModalOpen,
+    isKanbanEditOpen
   ]);
+
+  useEffect(() => {
+    if (activeSidebarSection === 'todos') {
+      refreshLegacyActivityTodos();
+    }
+    if (activeSidebarSection !== 'todos' && isTodoDetailModalOpen) {
+      setIsTodoDetailModalOpen(false);
+      setTodoDetailActivity(null);
+    }
+    if (activeSidebarSection !== 'todos' && isKanbanEditOpen) {
+      setIsKanbanEditOpen(false);
+      setSelectedKanbanTodoId(null);
+    }
+  }, [activeSidebarSection, isTodoDetailModalOpen, isKanbanEditOpen]);
 
   // eslint-disable-next-line
   const updateCompletions = (date, activityId, completed) => {
@@ -1708,6 +2427,14 @@ export default function App() {
             <span>Recursos</span>
           </button>
           <button
+            className={`sidebar-nav-item ${activeSidebarSection === 'todos' ? 'active' : ''}`}
+            type="button"
+            onClick={handleOpenTodos}
+          >
+            <FaListUl />
+            <span>Todo/List</span>
+          </button>
+          <button
             className={`sidebar-nav-item ${activeSidebarSection === 'settings' ? 'active' : ''}`}
             type="button"
             onClick={handleOpenSettings}
@@ -1738,6 +2465,40 @@ export default function App() {
             onDeleteActivity={handleDeleteActivityFromPlan}
             onUpdateActivity={handleUpdateActivityInPlan}
             onCopyFromPlan={handleCopyFromPlan}
+          />
+        ) : activeSidebarSection === 'todos' ? (
+          <TodoListView
+            todos={globalTodos}
+            todoInput={globalTodoInput}
+            onTodoInputChange={handleGlobalTodoInputChange}
+            onAddTodo={handleAddGlobalTodo}
+            onToggleTodo={handleToggleGlobalTodo}
+            onDeleteTodo={handleDeleteGlobalTodo}
+            remainingCount={globalTodoRemainingCount}
+            totalCount={globalTodoTotalCount}
+            activityTodoSummaries={activityTodoSummaries}
+            onOpenActivityTodo={handleOpenActivityTodoDetail}
+            todoViewMode={todoViewMode}
+            onTodoViewModeChange={handleTodoViewModeChange}
+            kanbanFilter={kanbanFilter}
+            onKanbanFilterChange={handleKanbanFilterChange}
+            kanbanSort={kanbanSort}
+            onKanbanSortChange={handleKanbanSortChange}
+            kanbanStatuses={KANBAN_STATUSES}
+            kanbanColumns={kanbanColumns}
+            kanbanContextNotice={kanbanContextNotice}
+            onCreateKanbanTodo={handleCreateKanbanTodo}
+            onMoveKanbanTodo={handleMoveKanbanTodo}
+            onOpenKanbanEdit={handleOpenKanbanEdit}
+            isKanbanEditOpen={isKanbanEditOpen}
+            selectedKanbanTodoId={selectedKanbanTodoId}
+            kanbanEditDraft={kanbanEditDraft}
+            onKanbanEditDraftChange={handleKanbanEditDraftChange}
+            onKanbanEditTagsChange={handleKanbanEditTagsChange}
+            onSaveKanbanEdit={handleSaveKanbanEdit}
+            onCloseKanbanEdit={handleCloseKanbanEdit}
+            onDeleteKanbanTodo={handleDeleteKanbanTodo}
+            quote={'"La disciplina de hoy crea la libertad de tu semana."'}
           />
         ) : (
         <>
@@ -2234,6 +2995,14 @@ export default function App() {
         </>
         )}
       </div>
+
+      {isTodoDetailModalOpen && todoDetailActivity && (
+        <TodoListModal
+          isOpen={isTodoDetailModalOpen}
+          onClose={handleCloseTodoDetailModal}
+          activity={todoDetailActivity}
+        />
+      )}
 
       {isModalOpen && selectedDay && (
         <DayDetailModal
