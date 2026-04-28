@@ -218,7 +218,7 @@ const parseLegacyActivityTodos = () => {
 };
 
 export default function App() {
-  // ID único de dispositivo confiable
+  // eslint-disable-next-line
   const [deviceId] = useState(() => {
     let id = localStorage.getItem('trustedDeviceId');
     if (!id) {
@@ -323,6 +323,7 @@ export default function App() {
       if (mounted) setIsAuthLoading(false);
     })();
     return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadWeeksFromDB = useCallback(async () => {
