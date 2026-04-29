@@ -29,6 +29,7 @@ import {
   FaUndo,
   FaRedo,
   FaTimes,
+  FaBars,
   FaSearch,
   FaClipboardList
 } from 'react-icons/fa';
@@ -723,7 +724,6 @@ export default function App() {
   const handleLogin = async (username, mode = 'login') => {
     const email = `${username}@studycart.app`;
     const password = `${username}_studycart_${username.length}`;
-    let supabaseOk = false;
     try {
       const supabase = (await import('./services/supabaseClient')).default;
       if (mode === 'register') {
@@ -740,8 +740,6 @@ export default function App() {
             setLoginError(error.message);
             return;
           }
-        } else {
-          supabaseOk = true;
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -758,8 +756,6 @@ export default function App() {
             setLoginError(error.message);
             return;
           }
-        } else {
-          supabaseOk = true;
         }
       }
     } catch {
@@ -1293,6 +1289,46 @@ export default function App() {
   const [customActivities, setCustomActivities] = useState({});
   const [activeSidebarSection, setActiveSidebarSection] = useState('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  const closeMobileSidebarIfNeeded = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    if (window.matchMedia('(max-width: 920px)').matches) {
+      setIsMobileSidebarOpen(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const mediaQuery = window.matchMedia('(max-width: 920px)');
+    if (!mediaQuery.matches) {
+      setIsMobileSidebarOpen(false);
+      return undefined;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    if (isMobileSidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = previousOverflow || '';
+    }
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMobileSidebarOpen]);
+
+  useEffect(() => {
+    if (!isMobileSidebarOpen) return undefined;
+    const handleEscapeKey = (event) => {
+      if (event.key === 'Escape') {
+        setIsMobileSidebarOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleEscapeKey);
+    return () => window.removeEventListener('keydown', handleEscapeKey);
+  }, [isMobileSidebarOpen]);
 
   const handleSaveNotes = (dayKey, newNotes) => {
     setNotes(prevNotes => ({ ...prevNotes, [dayKey]: newNotes }));
@@ -2393,8 +2429,25 @@ export default function App() {
   }
 
   return (
-    <div className={`dashboard-shell ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-      <aside className={`dashboard-sidebar ${isSidebarCollapsed ? 'is-collapsed' : ''}`}>
+    <div className={`dashboard-shell ${isSidebarCollapsed ? 'sidebar-collapsed' : ''} ${isMobileSidebarOpen ? 'mobile-sidebar-open' : ''}`}>
+      <button
+        type="button"
+        className="mobile-sidebar-toggle"
+        onClick={() => setIsMobileSidebarOpen(prev => !prev)}
+        aria-label={isMobileSidebarOpen ? 'Cerrar menú lateral' : 'Abrir menú lateral'}
+        aria-expanded={isMobileSidebarOpen}
+      >
+        {isMobileSidebarOpen ? <FaTimes /> : <FaBars />}
+      </button>
+      {isMobileSidebarOpen && (
+        <button
+          type="button"
+          className="mobile-sidebar-backdrop"
+          aria-label="Cerrar menú"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
+      <aside className={`dashboard-sidebar ${isSidebarCollapsed ? 'is-collapsed' : ''} ${isMobileSidebarOpen ? 'is-mobile-open' : ''}`}>
         <div className="sidebar-head">
           <div className="sidebar-brand">
             <span className="sidebar-brand-dot">◉</span>
@@ -2414,7 +2467,10 @@ export default function App() {
           <button
             className={`sidebar-nav-item ${activeSidebarSection === 'dashboard' ? 'active' : ''}`}
             type="button"
-            onClick={handleSidebarDashboard}
+            onClick={() => {
+              handleSidebarDashboard();
+              closeMobileSidebarIfNeeded();
+            }}
           >
             <FaThLarge />
             <span>Dashboard</span>
@@ -2422,7 +2478,10 @@ export default function App() {
           <button
             className={`sidebar-nav-item ${activeSidebarSection === 'planner' ? 'active' : ''}`}
             type="button"
-            onClick={handleOpenPlanner}
+            onClick={() => {
+              handleOpenPlanner();
+              closeMobileSidebarIfNeeded();
+            }}
           >
             <FaClipboardList />
             <span>Planificador</span>
@@ -2430,7 +2489,10 @@ export default function App() {
           <button
             className={`sidebar-nav-item ${activeSidebarSection === 'activity' ? 'active' : ''}`}
             type="button"
-            onClick={handleOpenFrequency}
+            onClick={() => {
+              handleOpenFrequency();
+              closeMobileSidebarIfNeeded();
+            }}
           >
             <FaChartLine />
             <span>Actividad</span>
@@ -2438,7 +2500,10 @@ export default function App() {
           <button
             className={`sidebar-nav-item ${activeSidebarSection === 'calendar' ? 'active' : ''}`}
             type="button"
-            onClick={handleOpenCalendar}
+            onClick={() => {
+              handleOpenCalendar();
+              closeMobileSidebarIfNeeded();
+            }}
           >
             <FaCalendarAlt />
             <span>Calendario</span>
@@ -2446,7 +2511,10 @@ export default function App() {
           <button
             className={`sidebar-nav-item ${activeSidebarSection === 'resources' ? 'active' : ''}`}
             type="button"
-            onClick={handleOpenResources}
+            onClick={() => {
+              handleOpenResources();
+              closeMobileSidebarIfNeeded();
+            }}
           >
             <FaBook />
             <span>Recursos</span>
@@ -2454,7 +2522,10 @@ export default function App() {
           <button
             className={`sidebar-nav-item ${activeSidebarSection === 'todos' ? 'active' : ''}`}
             type="button"
-            onClick={handleOpenTodos}
+            onClick={() => {
+              handleOpenTodos();
+              closeMobileSidebarIfNeeded();
+            }}
           >
             <FaListUl />
             <span>Todo/List</span>
@@ -2462,7 +2533,10 @@ export default function App() {
           <button
             className={`sidebar-nav-item ${activeSidebarSection === 'settings' ? 'active' : ''}`}
             type="button"
-            onClick={handleOpenSettings}
+            onClick={() => {
+              handleOpenSettings();
+              closeMobileSidebarIfNeeded();
+            }}
           >
             <FaCog />
             <span>Ajustes</span>
@@ -2470,7 +2544,14 @@ export default function App() {
         </nav>
         <div className="sidebar-footer">
           <div className="sidebar-user">Bienvenido, {user.username}</div>
-          <button className="sidebar-logout-btn" type="button" onClick={handleLogout}>
+          <button
+            className="sidebar-logout-btn"
+            type="button"
+            onClick={() => {
+              closeMobileSidebarIfNeeded();
+              handleLogout();
+            }}
+          >
             <FaSignOutAlt />
             <span>Salir</span>
           </button>
