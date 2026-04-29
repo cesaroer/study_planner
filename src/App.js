@@ -318,8 +318,16 @@ export default function App() {
           const email = session.user.email || '';
           const username = email.replace('@studycart.app', '');
           setUser({ username, supabaseId: session.user.id });
+        } else if (mounted) {
+          const lastUser = localStorage.getItem('lastLoggedUsername');
+          if (lastUser) setUser({ username: lastUser });
         }
-      } catch {}
+      } catch {
+        if (mounted) {
+          const lastUser = localStorage.getItem('lastLoggedUsername');
+          if (lastUser) setUser({ username: lastUser });
+        }
+      }
       if (mounted) setIsAuthLoading(false);
     })();
     return () => { mounted = false; };
@@ -715,6 +723,7 @@ export default function App() {
   const handleLogin = async (username, mode = 'login') => {
     const email = `${username}@studycart.app`;
     const password = `${username}_studycart_${username.length}`;
+    let supabaseOk = false;
     try {
       const supabase = (await import('./services/supabaseClient')).default;
       if (mode === 'register') {
@@ -723,10 +732,16 @@ export default function App() {
           if (error.message.includes('already registered')) {
             setLoginError('Ese usuario ya existe. Inicia sesión.');
             setAuthMode('login');
+            return;
+          }
+          if (error.message.includes('rate limit') || error.message.includes('network') || error.message.includes('fetch')) {
+            // fall through to offline login
           } else {
             setLoginError(error.message);
+            return;
           }
-          return;
+        } else {
+          supabaseOk = true;
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -735,17 +750,26 @@ export default function App() {
             setLoginError('Usuario no encontrado. ¿Quieres crear una cuenta?');
             setAuthMode('register');
             setPendingUsername(username);
+            return;
+          }
+          if (error.message.includes('rate limit') || error.message.includes('network') || error.message.includes('fetch')) {
+            // fall through to offline login
           } else {
             setLoginError(error.message);
+            return;
           }
-          return;
+        } else {
+          supabaseOk = true;
         }
       }
-      setUser({ username });
-      setLoginError('');
-    } catch (e) {
-      setLoginError('Error de conexión');
+    } catch {
+      // offline - fall through
     }
+
+    localStorage.setItem('lastLoggedUsername', username);
+    localStorage.setItem('hasHadUser', 'true');
+    setUser({ username });
+    setLoginError('');
   }; 
 
   const handleLogout = async () => {
