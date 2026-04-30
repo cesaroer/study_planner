@@ -1,8 +1,10 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from api.auth import get_current_user
 from api.database import get_supabase
 from api.models.plan import PlanCreate, PlanUpdate
 
+logger = logging.getLogger("plans")
 router = APIRouter()
 
 
@@ -36,14 +38,22 @@ async def list_plans(user: dict = Depends(get_current_user)):
 
 @router.post("")
 async def create_plan(body: PlanCreate, user: dict = Depends(get_current_user)):
+    logger.info(f"Create plan request - user: {user.get('username')}, plan name: {body.name}")
     sb = get_supabase()
     uid = user["user_id"]
-    resp = sb.table("plans").insert({"user_id": uid, "name": body.name}).execute()
-    if not resp.data:
-        raise HTTPException(status_code=400, detail="Could not create plan")
-    row = resp.data[0]
-    active_plan_id = _get_active_plan_id(sb, uid)
-    return _plan_row_to_dict(row, active_plan_id)
+    try:
+        logger.info(f"Inserting plan into DB - user_id: {uid}, name: {body.name}")
+        resp = sb.table("plans").insert({"user_id": uid, "name": body.name}).execute()
+        if not resp.data:
+            logger.error(f"Insert returned no data for user {uid}")
+            raise HTTPException(status_code=400, detail="Could not create plan")
+        row = resp.data[0]
+        logger.info(f"Plan created successfully - plan_id: {row['id']}")
+        active_plan_id = _get_active_plan_id(sb, uid)
+        return _plan_row_to_dict(row, active_plan_id)
+    except Exception as e:
+        logger.error(f"Error creating plan for user {uid}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error creating plan: {str(e)}")
 
 
 @router.put("/{plan_id}")
