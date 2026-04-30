@@ -1159,8 +1159,6 @@ export default function App() {
 
     setIsSavingPlanId(planId);
     try {
-      await api.post('/auth/profile', {}, { actionTitle: 'Perfil verificado' });
-
       const currentMeta = planSyncMeta[planId] || {};
       let cloudPlanId = currentMeta.cloudPlanId || null;
 
