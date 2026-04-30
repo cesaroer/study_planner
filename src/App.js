@@ -764,7 +764,7 @@ export default function App() {
   }, [DAYS_LIST]);
 
   const pullCloudPlansIntoLocal = useCallback(async () => {
-    if (!currentUserKey || !user?.supabaseId) return [];
+    if (!currentUserKey || !user) return [];
     const remotePlans = await api.get('/plans', {
       actionTitle: 'Planes recuperados de la nube'
     });
@@ -821,7 +821,7 @@ export default function App() {
       });
     }
     return hydratedPlans;
-  }, [DAYS_LIST, currentUserKey, updatePlanSyncMeta, user?.supabaseId]);
+  }, [DAYS_LIST, currentUserKey, updatePlanSyncMeta, user]);
 
   const loadPlansFromDB = useCallback(async () => {
     if (!currentUserKey) { setStudyPlans([]); setActivePlanId(null); return; }
@@ -881,7 +881,7 @@ export default function App() {
         }
       }
 
-      const canUseCloud = Boolean(user?.supabaseId);
+      const canUseCloud = Boolean(user);
       const shouldPullFromCloud = canUseCloud && (plans.length === 0 || (
         plans.length === 1 && plans[0].id === 'plan_default'
       ));
@@ -951,7 +951,7 @@ export default function App() {
         } catch { setStudyPlans([]); setActivePlanId(null); }
       } else { setStudyPlans([]); setActivePlanId(null); }
     }
-  }, [currentUserKey, DAYS_LIST, pullCloudPlansIntoLocal, user?.supabaseId]);
+  }, [currentUserKey, DAYS_LIST, pullCloudPlansIntoLocal, user]);
 
   useEffect(() => { loadPlansFromDB(); }, [loadPlansFromDB]);
 
@@ -1138,11 +1138,11 @@ export default function App() {
   const handleSavePlanToCloud = useCallback(async (planId) => {
     const targetPlan = studyPlans.find(plan => plan.id === planId);
     if (!targetPlan || !currentUserKey) return false;
-    if (!user?.supabaseId) {
+    if (!user) {
       pushToast({
         type: 'info',
-        title: 'Guardado en nube no disponible',
-        message: 'Inicia sesión en Supabase para sincronizar con backend. Tu plan ya está guardado localmente.',
+        title: 'Inicia sesión para sincronizar',
+        message: 'Tu plan está guardado localmente. Inicia sesión para sincronizarlo con el backend.',
         duration: 6500,
       });
       return false;
@@ -1232,7 +1232,7 @@ export default function App() {
     replaceRemotePlanActivities,
     studyPlans,
     updatePlanSyncMeta,
-    user?.supabaseId
+    user
   ]);
 
   useEffect(() => {
