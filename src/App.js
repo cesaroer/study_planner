@@ -960,6 +960,18 @@ export default function App() {
     DS.setActivePlanId(currentUserKey, activePlanId || null).catch(() => {});
   }, [currentUserKey, activePlanId]);
 
+  const handleSetActivePlan = useCallback(async (planId) => {
+    setActivePlanId(planId);
+    if (!planId || !user) return;
+    const meta = planSyncMeta[planId];
+    const cloudPlanId = meta?.cloudPlanId || (isUuid(planId) ? planId : null);
+    if (cloudPlanId) {
+      try {
+        await api.patch(`/plans/${cloudPlanId}/activate`);
+      } catch {}
+    }
+  }, [planSyncMeta, user]);
+
   // CRUD de planes
   const handleCreatePlan = async (planId, name) => {
     const emptyActivities = {};
@@ -3453,7 +3465,7 @@ export default function App() {
           <WeeklyPlanner
             plans={studyPlans}
             activePlanId={activePlanId}
-            onSetActivePlan={setActivePlanId}
+            onSetActivePlan={handleSetActivePlan}
             onCreatePlan={handleCreatePlan}
             onDeletePlan={handleDeletePlan}
             onRenamePlan={handleRenamePlan}
