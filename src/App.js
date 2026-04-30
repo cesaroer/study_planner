@@ -966,11 +966,29 @@ export default function App() {
     const meta = planSyncMeta[planId];
     const cloudPlanId = meta?.cloudPlanId || (isUuid(planId) ? planId : null);
     if (cloudPlanId) {
-      try {
-        await api.patch(`/plans/${cloudPlanId}/activate`);
-      } catch {}
+      try { await api.patch(`/plans/${cloudPlanId}/activate`); } catch {}
     }
-  }, [planSyncMeta, user]);
+    if (currentWeek && weeksData[currentWeek]?.length > 0) {
+      pushToast({
+        type: 'info',
+        title: 'Plan activo cambiado',
+        message: '¿Aplicar el nuevo plan a la semana actual también?',
+        actionLabel: 'Aplicar',
+        action: async () => {
+          try {
+            await DS.deployPlanToWeek(currentUserKey, currentWeek, planId);
+            const deployedWeek = await DS.getWeek(currentUserKey, currentWeek);
+            if (deployedWeek) {
+              const { all } = await DS.getWeekActivities(deployedWeek.id);
+              const deduped = cleanDuplicatedActivities(all);
+              setWeeksDataWithHistory(prev => ({ ...prev, [currentWeek]: deduped }));
+            }
+          } catch {}
+        },
+        duration: 10000,
+      });
+    }
+  }, [planSyncMeta, user, currentWeek, weeksData, currentUserKey, pushToast]);
 
   // CRUD de planes
   const handleCreatePlan = async (planId, name) => {
