@@ -4,11 +4,10 @@ from api.database import get_supabase
 from api.models.activity import (
     PlanActivityCreate,
     PlanActivityUpdate,
-    PlanActivityResponse,
     DAYS,
     ACTIVITY_TYPES,
 )
-from api.models.plan import PlanResponse
+from api.utils import sb_single
 
 router = APIRouter()
 
@@ -39,8 +38,8 @@ def _act_row_to_response(row: dict) -> dict:
 
 
 def _verify_plan_owner(sb, plan_id: str, user_id: str):
-    plan = sb.table("plans").select("id").eq("id", plan_id).eq("user_id", user_id).maybe_single().execute()
-    if not plan.data:
+    plan = sb_single(sb.table("plans").select("id").eq("id", plan_id).eq("user_id", user_id))
+    if not plan:
         raise HTTPException(status_code=404, detail="Plan not found")
 
 
@@ -49,15 +48,9 @@ async def get_plan_activities(plan_id: str, user: dict = Depends(get_current_use
     sb = get_supabase()
     uid = user["user_id"]
     _verify_plan_owner(sb, plan_id, uid)
-    resp = (
-        sb.table("plan_activities")
-        .select("*")
-        .eq("plan_id", plan_id)
-        .order("orden")
-        .execute()
-    )
+    resp = sb.table("plan_activities").select("*").eq("plan_id", plan_id).order("orden").execute()
     grouped: dict[str, list] = {d: [] for d in DAYS}
-    for act in resp.data:
+    for act in (resp.data or []):
         grouped.setdefault(act["dia"], []).append(_act_row_to_response(act))
     return grouped
 
@@ -79,7 +72,7 @@ async def add_plan_activity(plan_id: str, body: PlanActivityCreate, user: dict =
         "tags": body.tags,
     }
     resp = sb.table("plan_activities").insert(insert_data).execute()
-    if not resp.data:
+    if not resp or not resp.data:
         raise HTTPException(status_code=400, detail="Could not create activity")
     return _act_row_to_response(resp.data[0])
 
@@ -89,15 +82,8 @@ async def update_plan_activity(plan_id: str, act_id: str, body: PlanActivityUpda
     sb = get_supabase()
     uid = user["user_id"]
     _verify_plan_owner(sb, plan_id, uid)
-    existing = (
-        sb.table("plan_activities")
-        .select("id")
-        .eq("id", act_id)
-        .eq("plan_id", plan_id)
-        .maybe_single()
-        .execute()
-    )
-    if not existing.data:
+    existing = sb_single(sb.table("plan_activities").select("id").eq("id", act_id).eq("plan_id", plan_id))
+    if not existing:
         raise HTTPException(status_code=404, detail="Activity not found")
     updates = body.model_dump(exclude_none=True)
     if "tipo" in updates:
@@ -113,15 +99,8 @@ async def delete_plan_activity(plan_id: str, act_id: str, user: dict = Depends(g
     sb = get_supabase()
     uid = user["user_id"]
     _verify_plan_owner(sb, plan_id, uid)
-    existing = (
-        sb.table("plan_activities")
-        .select("id")
-        .eq("id", act_id)
-        .eq("plan_id", plan_id)
-        .maybe_single()
-        .execute()
-    )
-    if not existing.data:
+    existing = sb_single(sb.table("plan_activities").select("id").eq("id", act_id).eq("plan_id", plan_id))
+    if not existing:
         raise HTTPException(status_code=404, detail="Activity not found")
     sb.table("plan_activities").delete().eq("id", act_id).execute()
     return {"deleted": True, "id": act_id}
@@ -150,7 +129,7 @@ async def batch_plan_activities(plan_id: str, body: dict, user: dict = Depends(g
                     "orden": act.get("orden", 0),
                     "tags": act.get("tags", []),
                 }).execute()
-                results.append({"action": "add", "status": "ok", "id": resp.data[0]["id"] if resp.data else None})
+                results.append({"action": "add", "status": "ok", "id": resp.data[0]["id"] if resp and resp.data else None})
             elif action == "update":
                 act_id = op.get("activityId")
                 updates = op.get("updates", {})

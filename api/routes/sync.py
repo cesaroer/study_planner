@@ -2,6 +2,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from api.auth import get_current_user
 from api.database import get_supabase
+from api.utils import sb_single
 
 router = APIRouter()
 
@@ -55,8 +56,8 @@ async def push_changes(body: dict, user: dict = Depends(get_current_user)):
             results.append({"op_id": None, "status": "error", "detail": "Missing op_id"})
             continue
 
-        existing = sb.table("sync_log").select("op_id").eq("op_id", op_id).maybe_single().execute()
-        if existing.data:
+        existing = sb_single(sb.table("sync_log").select("op_id").eq("op_id", op_id))
+        if existing:
             results.append({"op_id": op_id, "status": "duplicate"})
             continue
 

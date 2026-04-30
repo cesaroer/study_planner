@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from api.auth import get_current_user
 from api.database import get_supabase
+from api.utils import sb_single
 
 logger = logging.getLogger("auth")
 router = APIRouter()
@@ -17,8 +18,8 @@ class RegisterBody(BaseModel):
 async def check_user(username: str):
     logger.info(f"Check user request: {username}")
     sb = get_supabase()
-    profile = sb.table("profiles").select("username").eq("username", username).maybe_single().execute()
-    exists = profile.data is not None
+    profile = sb_single(sb.table("profiles").select("username").eq("username", username))
+    exists = profile is not None
     logger.info(f"User {username} exists: {exists}")
     return {"exists": exists}
 
@@ -31,8 +32,8 @@ async def register_user(body: RegisterBody):
         logger.warning("Register: username empty")
         raise HTTPException(status_code=400, detail="username requerido")
     sb = get_supabase()
-    existing = sb.table("profiles").select("id").eq("username", username).maybe_single().execute()
-    if existing.data:
+    existing = sb_single(sb.table("profiles").select("id").eq("username", username))
+    if existing:
         logger.warning(f"Register: user already exists: {username}")
         raise HTTPException(status_code=409, detail="Ese usuario ya existe")
     user_id = str(uuid.uuid4())

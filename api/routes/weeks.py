@@ -2,38 +2,32 @@ from fastapi import APIRouter, Depends, HTTPException
 from api.auth import get_current_user
 from api.database import get_supabase
 from api.models.activity import DAYS
+from api.utils import sb_single
 
 router = APIRouter()
 
 
 def _verify_week_owner(sb, week_id: str, user_id: str) -> dict:
-    week = sb.table("weeks").select("*").eq("id", week_id).eq("user_id", user_id).maybe_single().execute()
-    if not week.data:
+    week = sb_single(sb.table("weeks").select("*").eq("id", week_id).eq("user_id", user_id))
+    if not week:
         raise HTTPException(status_code=404, detail="Week not found")
-    return week.data
+    return week
 
 
 @router.get("")
 async def get_week(week_start: str, user: dict = Depends(get_current_user)):
     sb = get_supabase()
     uid = user["user_id"]
-    week = (
-        sb.table("weeks")
-        .select("*")
-        .eq("user_id", uid)
-        .eq("week_start", week_start)
-        .maybe_single()
-        .execute()
-    )
-    if not week.data:
+    week = sb_single(sb.table("weeks").select("*").eq("user_id", uid).eq("week_start", week_start))
+    if not week:
         return {"week": None, "activities": [], "notes": {}}
-    week_id = week.data["id"]
+    week_id = week["id"]
     acts = sb.table("week_activities").select("*").eq("week_id", week_id).order("orden").execute()
     notes = sb.table("week_notes").select("*").eq("week_id", week_id).execute()
-    notes_map = {n["dia"]: n["content"] for n in notes.data}
+    notes_map = {n["dia"]: n["content"] for n in (notes.data or [])}
     return {
-        "week": week.data,
-        "activities": acts.data,
+        "week": week,
+        "activities": acts.data or [],
         "notes": notes_map,
     }
 
@@ -48,7 +42,7 @@ async def get_weeks_range(from_: str = "", to: str = "", user: dict = Depends(ge
     if to:
         query = query.lte("week_start", to)
     resp = query.order("week_start").execute()
-    return resp.data
+    return resp.data or []
 
 
 @router.post("/deploy")
@@ -59,22 +53,15 @@ async def deploy_week(body: dict, user: dict = Depends(get_current_user)):
     if not week_start:
         raise HTTPException(status_code=400, detail="week_start is required")
 
-    pref = sb.table("user_preferences").select("active_plan_id").eq("user_id", uid).maybe_single().execute()
-    active_plan_id = pref.data.get("active_plan_id") if pref.data else None
+    pref = sb_single(sb.table("user_preferences").select("active_plan_id").eq("user_id", uid))
+    active_plan_id = pref.get("active_plan_id") if pref else None
     if not active_plan_id:
         raise HTTPException(status_code=400, detail="No active plan set")
 
-    existing = (
-        sb.table("weeks")
-        .select("id")
-        .eq("user_id", uid)
-        .eq("week_start", week_start)
-        .maybe_single()
-        .execute()
-    )
-    if existing.data:
-        sb.table("week_activities").delete().eq("week_id", existing.data["id"]).execute()
-        week_id = existing.data["id"]
+    existing = sb_single(sb.table("weeks").select("id").eq("user_id", uid).eq("week_start", week_start))
+    if existing:
+        sb.table("week_activities").delete().eq("week_id", existing["id"]).execute()
+        week_id = existing["id"]
         sb.table("weeks").update({"plan_id": active_plan_id}).eq("id", week_id).execute()
     else:
         resp = sb.table("weeks").insert({
@@ -84,15 +71,9 @@ async def deploy_week(body: dict, user: dict = Depends(get_current_user)):
         }).execute()
         week_id = resp.data[0]["id"]
 
-    plan_acts = (
-        sb.table("plan_activities")
-        .select("*")
-        .eq("plan_id", active_plan_id)
-        .order("orden")
-        .execute()
-    )
+    plan_acts = sb.table("plan_activities").select("*").eq("plan_id", active_plan_id).order("orden").execute()
     deployed = 0
-    for act in plan_acts.data:
+    for act in (plan_acts.data or []):
         sb.table("week_activities").insert({
             "week_id": week_id,
             "plan_activity_id": act["id"],

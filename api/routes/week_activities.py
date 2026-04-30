@@ -2,21 +2,22 @@ from fastapi import APIRouter, Depends, HTTPException
 from api.auth import get_current_user
 from api.database import get_supabase
 from api.models.activity import WeekActivityCreate, WeekActivityUpdate, ACTIVITY_TYPES, DAYS
+from api.utils import sb_single
 
 router = APIRouter()
 
 
 def _verify_week_owner(sb, week_id: str, user_id: str):
-    week = sb.table("weeks").select("id").eq("id", week_id).eq("user_id", user_id).maybe_single().execute()
-    if not week.data:
+    week = sb_single(sb.table("weeks").select("id").eq("id", week_id).eq("user_id", user_id))
+    if not week:
         raise HTTPException(status_code=404, detail="Week not found")
 
 
 def _verify_act_in_week(sb, act_id: str, week_id: str):
-    act = sb.table("week_activities").select("id").eq("id", act_id).eq("week_id", week_id).maybe_single().execute()
-    if not act.data:
+    act = sb_single(sb.table("week_activities").select("id").eq("id", act_id).eq("week_id", week_id))
+    if not act:
         raise HTTPException(status_code=404, detail="Activity not found in this week")
-    return act.data
+    return act
 
 
 def _act_to_response(row: dict) -> dict:
@@ -44,7 +45,7 @@ async def get_week_activities(week_id: str, user: dict = Depends(get_current_use
     sb = get_supabase()
     _verify_week_owner(sb, week_id, user["user_id"])
     resp = sb.table("week_activities").select("*").eq("week_id", week_id).order("orden").execute()
-    return [_act_to_response(r) for r in resp.data]
+    return [_act_to_response(r) for r in (resp.data or [])]
 
 
 @router.post("/{week_id}/activities")
@@ -66,12 +67,12 @@ async def add_week_activity(week_id: str, body: WeekActivityCreate, user: dict =
         "tags": body.tags,
     }
     resp = sb.table("week_activities").insert(insert_data).execute()
-    if not resp.data:
+    if not resp or not resp.data:
         raise HTTPException(status_code=400, detail="Could not create activity")
     result = _act_to_response(resp.data[0])
     if body.sync_plan:
-        pref = sb.table("user_preferences").select("active_plan_id").eq("user_id", uid).maybe_single().execute()
-        active_plan_id = pref.data.get("active_plan_id") if pref.data else None
+        pref = sb_single(sb.table("user_preferences").select("active_plan_id").eq("user_id", uid))
+        active_plan_id = pref.get("active_plan_id") if pref else None
         if active_plan_id:
             sb.table("plan_activities").insert({
                 "plan_id": active_plan_id,
@@ -126,7 +127,7 @@ async def check_all(week_id: str, body: dict, user: dict = Depends(get_current_u
     dia = body.get("dia")
     acts = sb.table("week_activities").select("id").eq("week_id", week_id).eq("dia", dia).execute()
     updated = 0
-    for act in acts.data:
+    for act in (acts.data or []):
         sb.table("week_activities").update({"completado": True, "updated_at": "now()"}).eq("id", act["id"]).execute()
         updated += 1
     return {"updated": updated}
@@ -139,7 +140,7 @@ async def uncheck_all(week_id: str, body: dict, user: dict = Depends(get_current
     dia = body.get("dia")
     acts = sb.table("week_activities").select("id").eq("week_id", week_id).eq("dia", dia).execute()
     updated = 0
-    for act in acts.data:
+    for act in (acts.data or []):
         sb.table("week_activities").update({"completado": False, "updated_at": "now()"}).eq("id", act["id"]).execute()
         updated += 1
     return {"updated": updated}
