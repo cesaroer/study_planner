@@ -77,4 +77,6 @@ async def link_resource(act_id: str, body: dict, user: dict = Depends(get_curren
     else:
         raise HTTPException(status_code=404, detail="Activity not found")
     resp = sb.table("activity_resources").insert(insert_data).execute()
+    if not resp or not resp.data:
+        raise HTTPException(status_code=500, detail="Could not link resource")
     return resp.data[0]

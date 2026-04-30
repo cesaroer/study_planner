@@ -30,4 +30,6 @@ async def save_note(week_id: str, dia: str, body: NoteUpdate, user: dict = Depen
         resp = sb.table("week_notes").update({"content": body.content, "updated_at": "now()"}).eq("id", existing["id"]).execute()
     else:
         resp = sb.table("week_notes").insert({"week_id": week_id, "dia": dia, "content": body.content}).execute()
+    if not resp or not resp.data:
+        raise HTTPException(status_code=500, detail="Could not save note")
     return resp.data[0]

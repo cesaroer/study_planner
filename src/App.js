@@ -988,6 +988,7 @@ export default function App() {
         duration: 10000,
       });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planSyncMeta, user, currentWeek, weeksData, currentUserKey, pushToast]);
 
   // CRUD de planes

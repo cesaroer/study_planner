@@ -53,11 +53,11 @@ async def register_user(body: RegisterBody):
 async def get_me(user: dict = Depends(get_current_user)):
     sb = get_supabase()
     uid = user["user_id"]
-    profile = sb.table("profiles").select("*").eq("id", uid).maybe_single().execute()
-    prefs = sb.table("user_preferences").select("*").eq("user_id", uid).maybe_single().execute()
+    profile = sb_single(sb.table("profiles").select("*").eq("id", uid))
+    prefs = sb_single(sb.table("user_preferences").select("*").eq("user_id", uid))
     return {
         "user_id": uid,
         "username": user["username"],
-        "profile": profile.data,
-        "preferences": prefs.data,
+        "profile": profile,
+        "preferences": prefs,
     }

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from api.auth import get_current_user
 from api.database import get_supabase
 from api.models.global_todo import GlobalTodoCreate, GlobalTodoUpdate, GlobalTodoBatch
+from api.utils import sb_single
 
 router = APIRouter()
 
@@ -13,14 +14,8 @@ VALID_PRIORITIES = {"low", "medium", "high"}
 async def list_global_todos(user: dict = Depends(get_current_user)):
     sb = get_supabase()
     uid = user["user_id"]
-    resp = (
-        sb.table("global_todos")
-        .select("*")
-        .eq("user_id", uid)
-        .order("created_at", desc=True)
-        .execute()
-    )
-    return resp.data
+    resp = sb.table("global_todos").select("*").eq("user_id", uid).order("created_at", desc=True).execute()
+    return resp.data or []
 
 
 @router.post("/global-todos")
@@ -43,7 +38,7 @@ async def create_global_todo(body: GlobalTodoCreate, user: dict = Depends(get_cu
         "due_date": body.due_date,
     }
     resp = sb.table("global_todos").insert(row).execute()
-    if not resp.data:
+    if not resp or not resp.data:
         raise HTTPException(status_code=400, detail="Could not create todo")
     return resp.data[0]
 
@@ -52,14 +47,8 @@ async def create_global_todo(body: GlobalTodoCreate, user: dict = Depends(get_cu
 async def update_global_todo(todo_id: str, body: GlobalTodoUpdate, user: dict = Depends(get_current_user)):
     sb = get_supabase()
     uid = user["user_id"]
-    existing = (
-        sb.table("global_todos")
-        .select("id, user_id")
-        .eq("id", todo_id)
-        .maybe_single()
-        .execute()
-    )
-    if not existing.data or existing.data["user_id"] != uid:
+    existing = sb_single(sb.table("global_todos").select("id, user_id").eq("id", todo_id))
+    if not existing or existing["user_id"] != uid:
         raise HTTPException(status_code=404, detail="Todo not found")
     updates = body.model_dump(exclude_none=True)
     if updates.get("status") and updates["status"] not in VALID_STATUSES:
@@ -74,7 +63,7 @@ async def update_global_todo(todo_id: str, body: GlobalTodoUpdate, user: dict = 
     elif updates.get("status") and updates["status"] != "done":
         updates["completed"] = False
     resp = sb.table("global_todos").update(updates).eq("id", todo_id).execute()
-    if not resp.data:
+    if not resp or not resp.data:
         raise HTTPException(status_code=400, detail="Could not update todo")
     return resp.data[0]
 
@@ -83,14 +72,8 @@ async def update_global_todo(todo_id: str, body: GlobalTodoUpdate, user: dict = 
 async def delete_global_todo(todo_id: str, user: dict = Depends(get_current_user)):
     sb = get_supabase()
     uid = user["user_id"]
-    existing = (
-        sb.table("global_todos")
-        .select("id, user_id")
-        .eq("id", todo_id)
-        .maybe_single()
-        .execute()
-    )
-    if not existing.data or existing.data["user_id"] != uid:
+    existing = sb_single(sb.table("global_todos").select("id, user_id").eq("id", todo_id))
+    if not existing or existing["user_id"] != uid:
         raise HTTPException(status_code=404, detail="Todo not found")
     sb.table("global_todos").delete().eq("id", todo_id).execute()
     return {"deleted": True, "id": todo_id}
@@ -120,5 +103,5 @@ async def batch_replace_global_todos(body: GlobalTodoBatch, user: dict = Depends
         })
     if rows:
         resp = sb.table("global_todos").insert(rows).execute()
-        return resp.data
+        return resp.data or []
     return []

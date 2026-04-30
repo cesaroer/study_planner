@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git commit -m 'fix: remove supabaseId checks, use user existence instead *)",
+      "Bash(git commit -m 'fix: remove stale POST /auth/profile call, profile exists on login *)",
+      "Bash(git commit -m 'improve: better error message for missing X-Username header *)",
+      "Bash(git commit -m 'add explicit logging for auth and plan creation *)",
+      "Bash(xargs cat *)",
+      "Bash(git commit -m 'add global exception handler with explicit error detail and logging *)",
+      "Bash(git commit -m 'fix: replace all maybe_single\\(\\).execute\\(\\) with sb_single\\(\\) helper *)",
+      "Bash(git commit -m 'fix: sync active plan to cloud when user changes it *)",
+      "Bash(git commit -m 'fix: offer to redeploy current week when active plan changes *)",
+      "Bash(git commit -m 'audit fixes: remaining maybe_single, unsafe data access, dead code *)"
+    ]
+  }
+}

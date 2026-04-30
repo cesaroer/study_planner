@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from api.auth import get_current_user
 from api.database import get_supabase
 from api.models.pomodoro import PomodoroSessionCreate
+from api.utils import sb_single
 
 router = APIRouter()
 
@@ -18,7 +19,7 @@ async def list_sessions(user: dict = Depends(get_current_user)):
         .limit(100)
         .execute()
     )
-    return resp.data
+    return resp.data or []
 
 
 @router.post("/pomodoro/sessions")
@@ -35,7 +36,7 @@ async def create_session(body: PomodoroSessionCreate, user: dict = Depends(get_c
         "phase": body.phase,
     }
     resp = sb.table("pomodoro_sessions").insert(row).execute()
-    if not resp.data:
+    if not resp or not resp.data:
         raise HTTPException(status_code=400, detail="Could not create session")
     return resp.data[0]
 
@@ -51,10 +52,11 @@ async def get_stats(user: dict = Depends(get_current_user)):
         .eq("phase", "work")
         .execute()
     )
-    total_minutes = sum(r.get("duration_minutes", 0) for r in resp.data)
-    total_sessions = len(resp.data)
+    rows = resp.data or []
+    total_minutes = sum(r.get("duration_minutes", 0) for r in rows)
+    total_sessions = len(rows)
     by_type = {}
-    for r in resp.data:
+    for r in rows:
         t = r.get("activity_type", "Otro")
         if t not in by_type:
             by_type[t] = {"sessions": 0, "minutes": 0}
@@ -71,14 +73,8 @@ async def get_stats(user: dict = Depends(get_current_user)):
 async def delete_session(session_id: str, user: dict = Depends(get_current_user)):
     sb = get_supabase()
     uid = user["user_id"]
-    existing = (
-        sb.table("pomodoro_sessions")
-        .select("id, user_id")
-        .eq("id", session_id)
-        .maybe_single()
-        .execute()
-    )
-    if not existing.data or existing.data["user_id"] != uid:
+    existing = sb_single(sb.table("pomodoro_sessions").select("id, user_id").eq("id", session_id))
+    if not existing or existing["user_id"] != uid:
         raise HTTPException(status_code=404, detail="Session not found")
     sb.table("pomodoro_sessions").delete().eq("id", session_id).execute()
     return {"deleted": True, "id": session_id}

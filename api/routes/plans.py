@@ -59,6 +59,8 @@ async def update_plan(plan_id: str, body: PlanUpdate, user: dict = Depends(get_c
     if not existing:
         raise HTTPException(status_code=404, detail="Plan not found")
     resp = sb.table("plans").update({"name": body.name, "updated_at": "now()"}).eq("id", plan_id).execute()
+    if not resp or not resp.data:
+        raise HTTPException(status_code=500, detail="Could not update plan")
     active_plan_id = _get_active_plan_id(sb, uid)
     return _plan_row_to_dict(resp.data[0], active_plan_id)
 
@@ -90,6 +92,8 @@ async def activate_plan(plan_id: str, user: dict = Depends(get_current_user)):
         sb.table("user_preferences").insert({"user_id": uid, "active_plan_id": plan_id}).execute()
     active_plan_id = _get_active_plan_id(sb, uid)
     resp = sb.table("plans").select("*").eq("id", plan_id).execute()
+    if not resp or not resp.data:
+        raise HTTPException(status_code=500, detail="Could not retrieve plan after activation")
     return _plan_row_to_dict(resp.data[0], active_plan_id)
 
 

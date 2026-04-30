@@ -96,6 +96,8 @@ async def update_week_activity(week_id: str, act_id: str, body: WeekActivityUpda
         raise HTTPException(status_code=400, detail="No fields to update")
     updates["updated_at"] = "now()"
     resp = sb.table("week_activities").update(updates).eq("id", act_id).execute()
+    if not resp or not resp.data:
+        raise HTTPException(status_code=500, detail="Could not update activity")
     return _act_to_response(resp.data[0])
 
 
@@ -117,6 +119,8 @@ async def move_week_activity(week_id: str, act_id: str, body: dict, user: dict =
     if target_day not in DAYS:
         raise HTTPException(status_code=400, detail=f"Invalid target_day: {target_day}")
     resp = sb.table("week_activities").update({"dia": target_day, "updated_at": "now()"}).eq("id", act_id).execute()
+    if not resp or not resp.data:
+        raise HTTPException(status_code=500, detail="Could not move activity")
     return _act_to_response(resp.data[0])
 
 

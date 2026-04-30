@@ -32,4 +32,6 @@ async def update_preferences(body: PreferencesUpdate, user: dict = Depends(get_c
     else:
         updates["user_id"] = uid
         resp = sb.table("user_preferences").insert(updates).execute()
+    if not resp or not resp.data:
+        raise HTTPException(status_code=500, detail="Could not update preferences")
     return resp.data[0]
