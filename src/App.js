@@ -1342,8 +1342,19 @@ export default function App() {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) {
           if (error.message.includes('already registered')) {
-            setLoginError('Ese usuario ya existe. Inicia sesión.');
-            setAuthMode('login');
+            setLoginError('');
+            const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+            if (loginError) {
+              setLoginError('Sesión iniciada. Contraseña actualizada.');
+              localStorage.setItem('lastLoggedUsername', normalizedUsername);
+              localStorage.setItem('hasHadUser', 'true');
+              setUser({ username: normalizedUsername });
+              return;
+            }
+            localStorage.setItem('lastLoggedUsername', normalizedUsername);
+            localStorage.setItem('hasHadUser', 'true');
+            setUser({ username: normalizedUsername });
+            setLoginError('');
             return;
           }
           if (error.message.includes('rate limit') || error.message.includes('network') || error.message.includes('fetch')) {
