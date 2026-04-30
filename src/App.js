@@ -968,28 +968,26 @@ export default function App() {
     if (cloudPlanId) {
       try { await api.patch(`/plans/${cloudPlanId}/activate`); } catch {}
     }
-    if (currentWeek && weeksData[currentWeek]?.length > 0) {
-      pushToast({
-        type: 'info',
-        title: 'Plan activo cambiado',
-        message: '¿Aplicar el nuevo plan a la semana actual también?',
-        actionLabel: 'Aplicar',
-        action: async () => {
-          try {
-            await DS.deployPlanToWeek(currentUserKey, currentWeek, planId);
-            const deployedWeek = await DS.getWeek(currentUserKey, currentWeek);
-            if (deployedWeek) {
-              const { all } = await DS.getWeekActivities(deployedWeek.id);
-              const deduped = cleanDuplicatedActivities(all);
-              setWeeksDataWithHistory(prev => ({ ...prev, [currentWeek]: deduped }));
-            }
-          } catch {}
-        },
-        duration: 10000,
-      });
+    // Auto-redeploy current week with the new plan
+    if (currentWeek) {
+      try {
+        await DS.deployPlanToWeek(currentUserKey, currentWeek, planId);
+        const deployedWeek = await DS.getWeek(currentUserKey, currentWeek);
+        if (deployedWeek) {
+          const { all } = await DS.getWeekActivities(deployedWeek.id);
+          const deduped = cleanDuplicatedActivities(all);
+          setWeeksDataWithHistory(prev => ({ ...prev, [currentWeek]: deduped }));
+        }
+      } catch {}
     }
+    // Clear cached future weeks from state so initializeWeek re-runs on navigation
+    setWeeksData(prev => {
+      const next = {};
+      if (currentWeek && prev[currentWeek]) next[currentWeek] = prev[currentWeek];
+      return next;
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planSyncMeta, user, currentWeek, weeksData, currentUserKey, pushToast]);
+  }, [planSyncMeta, user, currentWeek, currentUserKey]);
 
   // CRUD de planes
   const handleCreatePlan = async (planId, name) => {
@@ -1408,7 +1406,8 @@ export default function App() {
         const week = await DS.getWeek(currentUserKey, currentWeek);
         if (week) {
           const { all } = await DS.getWeekActivities(week.id);
-          if (all.length > 0) {
+          const planMatches = !week.plan_id || week.plan_id === activePlanId;
+          if (all.length > 0 && planMatches) {
             const deduped = cleanDuplicatedActivities(all);
             if (deduped.length !== all.length) {
               await DS.replaceWeekActivities(week.id, deduped, currentWeek);
