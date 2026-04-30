@@ -462,7 +462,19 @@ export async function deployPlanToWeek(userId, weekStart, planId) {
     await tx2.store.put(wa);
   }
   await tx2.done;
+  const updatedWeek = { ...week, plan_id: planId };
+  await db.put('weeks', updatedWeek);
   return { weekId: week.id, deployed: planActs.length };
+}
+
+export async function getFutureWeeks(userId, fromWeekStart) {
+  const db = await getDB();
+  const all = await db.getAll('weeks');
+  const normalized = String(userId || '').trim().toLowerCase();
+  return all.filter(w =>
+    String(w.user_id || '').trim().toLowerCase() === normalized &&
+    w.week_start >= fromWeekStart
+  );
 }
 
 // ========================

@@ -968,22 +968,36 @@ export default function App() {
     if (cloudPlanId) {
       try { await api.patch(`/plans/${cloudPlanId}/activate`); } catch {}
     }
-    // Auto-redeploy current week with the new plan
-    if (currentWeek) {
+    if (!currentWeek) return;
+    // Redeploy current week + all future weeks that already exist in IndexedDB
+    const futureWeeks = await DS.getFutureWeeks(currentUserKey, currentWeek);
+    const newState = {};
+    for (const fw of futureWeeks) {
       try {
-        await DS.deployPlanToWeek(currentUserKey, currentWeek, planId);
-        const deployedWeek = await DS.getWeek(currentUserKey, currentWeek);
-        if (deployedWeek) {
-          const { all } = await DS.getWeekActivities(deployedWeek.id);
-          const deduped = cleanDuplicatedActivities(all);
-          setWeeksDataWithHistory(prev => ({ ...prev, [currentWeek]: deduped }));
+        await DS.deployPlanToWeek(currentUserKey, fw.week_start, planId);
+        const reloaded = await DS.getWeek(currentUserKey, fw.week_start);
+        if (reloaded) {
+          const { all } = await DS.getWeekActivities(reloaded.id);
+          newState[fw.week_start] = cleanDuplicatedActivities(all);
         }
       } catch {}
     }
-    // Clear cached future weeks from state so initializeWeek re-runs on navigation
+    // Safety net: if currentWeek wasn't in the list, deploy it
+    if (!newState[currentWeek]) {
+      try {
+        await DS.deployPlanToWeek(currentUserKey, currentWeek, planId);
+        const reloaded = await DS.getWeek(currentUserKey, currentWeek);
+        if (reloaded) {
+          const { all } = await DS.getWeekActivities(reloaded.id);
+          newState[currentWeek] = cleanDuplicatedActivities(all);
+        }
+      } catch {}
+    }
     setWeeksData(prev => {
-      const next = {};
-      if (currentWeek && prev[currentWeek]) next[currentWeek] = prev[currentWeek];
+      const next = { ...prev };
+      for (const [k, v] of Object.entries(newState)) {
+        next[k] = v;
+      }
       return next;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1406,7 +1420,7 @@ export default function App() {
         const week = await DS.getWeek(currentUserKey, currentWeek);
         if (week) {
           const { all } = await DS.getWeekActivities(week.id);
-          const planMatches = !week.plan_id || week.plan_id === activePlanId;
+          const planMatches = week.plan_id === activePlanId;
           if (all.length > 0 && planMatches) {
             const deduped = cleanDuplicatedActivities(all);
             if (deduped.length !== all.length) {
