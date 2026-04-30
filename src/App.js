@@ -1385,6 +1385,7 @@ export default function App() {
       const supabase = (await import('./services/supabaseClient')).default;
       await supabase.auth.signOut();
     } catch {}
+    localStorage.removeItem('lastLoggedUsername');
     setUser(null);
   };
 
