@@ -415,28 +415,9 @@ export default function App() {
   const [settingsSection, setSettingsSection] = useState('activities');
   useEffect(() => {
     if (user) { setIsAuthLoading(false); return; }
-    let mounted = true;
-    (async () => {
-      try {
-        const supabase = (await import('./services/supabaseClient')).default;
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session && mounted) {
-          const email = session.user.email || '';
-          const username = normalizeUsername(email.replace('@studycart.app', ''));
-          setUser({ username, supabaseId: session.user.id });
-        } else if (mounted) {
-          const lastUser = localStorage.getItem('lastLoggedUsername');
-          if (lastUser) setUser({ username: normalizeUsername(lastUser) });
-        }
-      } catch {
-        if (mounted) {
-          const lastUser = localStorage.getItem('lastLoggedUsername');
-          if (lastUser) setUser({ username: normalizeUsername(lastUser) });
-        }
-      }
-      if (mounted) setIsAuthLoading(false);
-    })();
-    return () => { mounted = false; };
+    const lastUser = localStorage.getItem('lastLoggedUsername');
+    if (lastUser) setUser({ username: normalizeUsername(lastUser) });
+    setIsAuthLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1334,68 +1315,46 @@ export default function App() {
 
   const handleLogin = async (username, mode = 'login') => {
     const normalizedUsername = normalizeUsername(username);
-    const email = `${normalizedUsername}@studycart.app`;
-    const password = `${normalizedUsername}_studycart_${normalizedUsername.length}`;
     try {
-      const supabase = (await import('./services/supabaseClient')).default;
-      if (mode === 'register') {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) {
-          if (error.message.includes('already registered')) {
-            setLoginError('');
-            const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
-            if (loginError) {
-              setLoginError('Sesión iniciada. Contraseña actualizada.');
-              localStorage.setItem('lastLoggedUsername', normalizedUsername);
-              localStorage.setItem('hasHadUser', 'true');
-              setUser({ username: normalizedUsername });
-              return;
-            }
-            localStorage.setItem('lastLoggedUsername', normalizedUsername);
-            localStorage.setItem('hasHadUser', 'true');
-            setUser({ username: normalizedUsername });
-            setLoginError('');
-            return;
-          }
-          if (error.message.includes('rate limit') || error.message.includes('network') || error.message.includes('fetch')) {
-            // fall through to offline login
-          } else {
-            setLoginError(error.message);
-            return;
-          }
+      const API_BASE = process.env.REACT_APP_API_URL || '/api';
+      if (mode === 'login') {
+        const res = await fetch(`${API_BASE}/auth/check/${encodeURIComponent(normalizedUsername)}`);
+        if (!res.ok) throw new Error('Error de red');
+        const { exists } = await res.json();
+        if (!exists) {
+          setLoginError('Usuario no encontrado. ¿Quieres crear una cuenta?');
+          setAuthMode('register');
+          setPendingUsername(normalizedUsername);
+          return;
         }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) {
-          if (error.message.includes('Invalid login')) {
-            setLoginError('Usuario no encontrado. ¿Quieres crear una cuenta?');
-            setAuthMode('register');
-            setPendingUsername(normalizedUsername);
-            return;
-          }
-          if (error.message.includes('rate limit') || error.message.includes('network') || error.message.includes('fetch')) {
-            // fall through to offline login
-          } else {
-            setLoginError(error.message);
-            return;
-          }
+        const res = await fetch(`${API_BASE}/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: normalizedUsername }),
+        });
+        if (res.status === 409) {
+          setLoginError('Ese usuario ya existe. Inicia sesión.');
+          setAuthMode('login');
+          return;
+        }
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setLoginError(data.detail || 'Error al crear usuario');
+          return;
         }
       }
     } catch {
-      // offline - fall through
+      // offline - continuar con localStorage
     }
 
     localStorage.setItem('lastLoggedUsername', normalizedUsername);
     localStorage.setItem('hasHadUser', 'true');
     setUser({ username: normalizedUsername });
     setLoginError('');
-  }; 
+  };
 
-  const handleLogout = async () => {
-    try {
-      const supabase = (await import('./services/supabaseClient')).default;
-      await supabase.auth.signOut();
-    } catch {}
+  const handleLogout = () => {
     localStorage.removeItem('lastLoggedUsername');
     setUser(null);
   };

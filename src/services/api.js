@@ -1,9 +1,6 @@
-import supabase from './supabaseClient';
 import { appendHttpLogEntry, createHttpRequestId } from './httpLogger';
 
 const API_BASE = process.env.REACT_APP_API_URL || '/api';
-
-let currentToken = null;
 
 const isJsonResponse = (response) => {
   const contentType = response.headers.get('content-type') || '';
@@ -19,17 +16,11 @@ const parseJsonOrText = async (response) => {
   return text;
 };
 
-export async function getAuthHeaders() {
-  const { data } = await supabase.auth.getSession();
-  const token = data?.session?.access_token;
-  if (token) {
-    currentToken = token;
-  }
-  const headers = {
-    'Content-Type': 'application/json',
-  };
-  if (currentToken) {
-    headers['Authorization'] = `Bearer ${currentToken}`;
+export function getAuthHeaders() {
+  const username = localStorage.getItem('lastLoggedUsername');
+  const headers = { 'Content-Type': 'application/json' };
+  if (username) {
+    headers['X-Username'] = username;
   }
   return headers;
 }
@@ -48,7 +39,7 @@ async function request(method, path, body = null, meta = {}) {
     payloadSummary: body ?? null,
   };
 
-  const headers = await getAuthHeaders();
+  const headers = getAuthHeaders();
   const options = { method, headers };
   if (body !== null) {
     options.body = JSON.stringify(body);
@@ -56,56 +47,6 @@ async function request(method, path, body = null, meta = {}) {
   try {
     const response = await fetch(`${API_BASE}${path}`, options);
     lastStatus = response.status;
-    if (response.status === 401) {
-      const { data } = await supabase.auth.refreshSession();
-      if (data.session) {
-        currentToken = data.session.access_token;
-        headers['Authorization'] = `Bearer ${currentToken}`;
-        const retry = await fetch(`${API_BASE}${path}`, { method, headers, body: body ? JSON.stringify(body) : null });
-        lastStatus = retry.status;
-        if (!retry.ok) {
-          const parsedRetry = await parseJsonOrText(retry);
-          const detail = typeof parsedRetry === 'string'
-            ? parsedRetry.slice(0, 260)
-            : parsedRetry?.detail || retry.statusText;
-          appendHttpLogEntry({
-            ...baseEntry,
-            ok: false,
-            status: retry.status,
-            durationMs: Date.now() - startedAt,
-            error: {
-              detail,
-              retry: true,
-            },
-          });
-          const retryError = new Error(detail || retry.statusText);
-          retryError.__httpLogged = true;
-          throw retryError;
-        }
-        const retryPayload = await parseJsonOrText(retry);
-        if (retryPayload !== null && typeof retryPayload === 'string') {
-          const nonJsonRetryError = new Error(
-            `Respuesta no JSON en ${method} ${path}. Posible backend no disponible o ruta mal configurada.`
-          );
-          nonJsonRetryError.__httpLogged = true;
-          appendHttpLogEntry({
-            ...baseEntry,
-            ok: false,
-            status: retry.status,
-            durationMs: Date.now() - startedAt,
-            error: nonJsonRetryError.message,
-          });
-          throw nonJsonRetryError;
-        }
-        appendHttpLogEntry({
-          ...baseEntry,
-          ok: true,
-          status: retry.status,
-          durationMs: Date.now() - startedAt,
-        });
-        return retryPayload;
-      }
-    }
     if (!response.ok) {
       const parsed = await parseJsonOrText(response);
       const detail = typeof parsed === 'string'
