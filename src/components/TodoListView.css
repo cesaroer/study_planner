@@ -1327,3 +1327,8 @@
     min-height: 0;
   }
 }
+
+.todo-kanban-context-menu .is-pomodoro {
+  color: rgba(89, 156, 255, 0.9);
+  font-weight: 700;
+}

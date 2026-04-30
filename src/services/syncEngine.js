@@ -11,6 +11,7 @@ import {
   cacheWeekNotes,
   cachePreferences,
   cacheGlobalTodos,
+  cachePomodoroSessions,
 } from './offlineQueue';
 
 let isSyncing = false;
@@ -114,6 +115,11 @@ export async function pullChanges(userId) {
             // handled by cache refresh
           } else if (change.record) {
             await cacheGlobalTodos(change.record.user_id, [change.record]);
+          }
+          break;
+        case 'pomodoro_sessions':
+          if (change.operation !== 'DELETE' && change.record) {
+            await cachePomodoroSessions(change.record.user_id, [change.record]);
           }
           break;
         default:

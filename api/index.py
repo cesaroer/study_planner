@@ -21,6 +21,7 @@ app.add_middleware(
 from api.routes import plans, plan_activities, weeks, week_activities
 from api.routes import notes, todos, tags, resources, stats, preferences, auth, sync
 from api.routes import global_todos
+from api.routes import pomodoro
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(plans.router, prefix="/api/plans", tags=["plans"])
@@ -35,6 +36,7 @@ app.include_router(stats.router, prefix="/api/stats", tags=["stats"])
 app.include_router(preferences.router, prefix="/api/preferences", tags=["preferences"])
 app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
 app.include_router(global_todos.router, prefix="/api", tags=["global-todos"])
+app.include_router(pomodoro.router, prefix="/api", tags=["pomodoro"])
 
 
 @app.get("/api/health")

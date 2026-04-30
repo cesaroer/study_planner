@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'studyplanner_offline';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 let dbPromise = null;
 
@@ -52,6 +52,11 @@ function getDB() {
           const s = db.createObjectStore('global_todos', { keyPath: 'id' });
           s.createIndex('user_id', 'user_id');
         }
+        if (!db.objectStoreNames.contains('pomodoro_sessions')) {
+          const s = db.createObjectStore('pomodoro_sessions', { keyPath: 'id' });
+          s.createIndex('user_id', 'user_id');
+          s.createIndex('week_activity_id', 'week_activity_id');
+        }
       },
     });
   }
@@ -86,9 +91,19 @@ function sortActivities(acts) {
 // PLANS
 // ========================
 
-export async function getAllPlans() {
+export async function getAllPlans(userId = null) {
   const db = await getDB();
-  return db.getAll('plans');
+  const plans = await db.getAll('plans');
+  if (!userId) return plans;
+  return plans.filter(plan => !plan.user_id || plan.user_id === userId);
+}
+
+export async function getAllPlansCaseInsensitive(userId) {
+  const normalized = String(userId || '').trim().toLowerCase();
+  if (!normalized) return [];
+  const db = await getDB();
+  const plans = await db.getAll('plans');
+  return plans.filter(plan => String(plan.user_id || '').trim().toLowerCase() === normalized);
 }
 
 export async function getPlan(planId) {
@@ -96,12 +111,13 @@ export async function getPlan(planId) {
   return db.get('plans', planId);
 }
 
-export async function createPlan(name, isDefault = false, overrideId = null) {
+export async function createPlan(name, isDefault = false, overrideId = null, userId = null) {
   const db = await getDB();
   const plan = {
     id: overrideId || `plan_${uid()}`,
     name,
     is_default: isDefault,
+    user_id: userId || null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -168,7 +184,7 @@ export async function getPlanActivities(planId) {
 export async function addPlanActivity(planId, activity) {
   const db = await getDB();
   const act = {
-    id: uid(),
+    id: activity.id || uid(),
     plan_id: planId,
     dia: activity.dia,
     actividad: activity.actividad,
@@ -181,6 +197,37 @@ export async function addPlanActivity(planId, activity) {
   };
   await db.put('plan_activities', act);
   return act;
+}
+
+export async function replacePlanActivities(planId, activitiesByDay = {}) {
+  const db = await getDB();
+  const existing = await db.getAllFromIndex('plan_activities', 'plan_id', planId);
+  const tx = db.transaction('plan_activities', 'readwrite');
+
+  for (const entry of existing) {
+    await tx.store.delete(entry.id);
+  }
+
+  for (const day of DAYS) {
+    const dayActivities = Array.isArray(activitiesByDay?.[day]) ? activitiesByDay[day] : [];
+    for (let index = 0; index < dayActivities.length; index += 1) {
+      const activity = dayActivities[index] || {};
+      await tx.store.put({
+        id: activity.id || uid(),
+        plan_id: planId,
+        dia: day,
+        actividad: activity.actividad || '',
+        tipo: activity.tipo || 'Secundaria',
+        icono: activity.icono || '📝',
+        orden: Number.isFinite(activity.orden) ? activity.orden : index,
+        tags: Array.isArray(activity.tags) ? activity.tags : [],
+        target_minutes: activity.target_minutes ?? activity.targetMinutes ?? 0,
+        created_at: activity.created_at || activity.createdAt || new Date().toISOString(),
+      });
+    }
+  }
+
+  await tx.done;
 }
 
 export async function updatePlanActivity(actId, updates) {
@@ -221,7 +268,8 @@ export async function copyPlanActivities(targetPlanId, sourcePlanId) {
 export async function getWeek(userId, weekStart) {
   const db = await getDB();
   const all = await db.getAllFromIndex('weeks', 'week_start', weekStart);
-  return all.find((w) => w.user_id === userId) || null;
+  const normalized = String(userId || '').trim().toLowerCase();
+  return all.find((w) => String(w.user_id || '').trim().toLowerCase() === normalized) || null;
 }
 
 export async function getOrCreateWeek(userId, weekStart, planId) {
@@ -245,6 +293,17 @@ export async function getWeeksInRange(userId, from, to) {
   return all.filter((w) => w.week_start >= from && w.week_start <= to).sort((a, b) => a.week_start.localeCompare(b.week_start));
 }
 
+export async function getWeeksInRangeCaseInsensitive(userId, from, to) {
+  const normalized = String(userId || '').trim().toLowerCase();
+  if (!normalized) return [];
+  const db = await getDB();
+  const all = await db.getAll('weeks');
+  return all
+    .filter((w) => String(w.user_id || '').trim().toLowerCase() === normalized)
+    .filter((w) => w.week_start >= from && w.week_start <= to)
+    .sort((a, b) => a.week_start.localeCompare(b.week_start));
+}
+
 // ========================
 // WEEK ACTIVITIES
 // ========================
@@ -264,26 +323,56 @@ export async function getWeekActivities(weekId) {
 
 export async function addWeekActivity(weekId, activity) {
   const db = await getDB();
-  const act = {
-    id: `${uid()}`,
-    week_id: weekId,
-    plan_activity_id: null,
-    dia: activity.dia,
-    actividad: activity.actividad,
-    tipo: activity.tipo,
-    icono: activity.icono || '📝',
-    completado: false,
-    bloqueada: false,
-    tags: activity.tags || [],
-    target_minutes: activity.target_minutes || 0,
-    spent_minutes: 0,
-    pomodoro_sessions: 0,
-    orden: activity.orden || 0,
-    updated_at: new Date().toISOString(),
-    semana: activity.semana || '',
-  };
+  const act = normalizeWeekActivityForStore(weekId, activity);
   await db.put('week_activities', act);
   return act;
+}
+
+function normalizeWeekActivityForStore(weekId, activity = {}, fallbackOrder = 0, weekStart = '') {
+  return {
+    id: activity.id || `${uid()}`,
+    week_id: weekId,
+    plan_activity_id: activity.plan_activity_id ?? activity.planActivityId ?? null,
+    dia: activity.dia || 'Lunes',
+    actividad: activity.actividad || '',
+    tipo: activity.tipo || 'Secundaria',
+    icono: activity.icono || '📝',
+    completado: Boolean(activity.completado),
+    bloqueada: Boolean(activity.bloqueada),
+    tags: Array.isArray(activity.tags) ? activity.tags : [],
+    target_minutes: activity.target_minutes ?? activity.targetMinutes ?? 0,
+    spent_minutes: activity.spent_minutes ?? activity.spentMinutes ?? 0,
+    pomodoro_sessions: activity.pomodoro_sessions ?? activity.pomodoroSessions ?? 0,
+    orden: Number.isFinite(Number(activity.orden)) ? Number(activity.orden) : fallbackOrder,
+    updated_at: activity.updated_at || activity.updatedAt || new Date().toISOString(),
+    semana: activity.semana || weekStart || '',
+    kanbanStatus: activity.kanbanStatus || null,
+  };
+}
+
+export async function replaceWeekActivities(weekId, activities = [], weekStart = '') {
+  const db = await getDB();
+  const safeActivities = Array.isArray(activities) ? activities : [];
+  const normalized = safeActivities.map((activity, index) => (
+    normalizeWeekActivityForStore(weekId, activity, index, weekStart)
+  ));
+  const incomingIds = new Set(normalized.map(activity => activity.id));
+
+  const tx = db.transaction('week_activities', 'readwrite');
+  const existing = await tx.store.index('week_id').getAll(weekId);
+
+  for (const current of existing) {
+    if (!incomingIds.has(current.id)) {
+      await tx.store.delete(current.id);
+    }
+  }
+
+  for (const activity of normalized) {
+    await tx.store.put(activity);
+  }
+
+  await tx.done;
+  return normalized;
 }
 
 export async function updateWeekActivity(actId, updates) {
@@ -546,6 +635,7 @@ export async function importPlansFromLocalStorage(plans, activePlanId, userId) {
       id: plan.id,
       name: plan.name,
       is_default: plan.isDefault || false,
+      user_id: userId || null,
       created_at: plan.createdAt || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
@@ -686,4 +776,24 @@ export async function pullGlobalTodosFromServer(userId) {
     }
   } catch {}
   return null;
+}
+
+export async function savePomodoroSession(userId, session) {
+  const db = await getDB();
+  await db.put('pomodoro_sessions', { ...session, user_id: userId });
+}
+
+export async function getPomodoroSessions(userId) {
+  const db = await getDB();
+  return db.getAllFromIndex('pomodoro_sessions', 'user_id', userId);
+}
+
+export async function getPomodoroStatsForActivity(activityId) {
+  const db = await getDB();
+  const all = await db.getAllFromIndex('pomodoro_sessions', 'week_activity_id', activityId);
+  const workSessions = all.filter(s => s.phase === 'work');
+  return {
+    sessions: workSessions.length,
+    minutes: workSessions.reduce((sum, s) => sum + (s.duration_minutes || 0), 0),
+  };
 }

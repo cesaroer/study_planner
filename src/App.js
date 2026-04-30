@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import WeekNavigation from './components/WeekNavigation';
 import DayView from './components/DayView';
@@ -12,9 +12,26 @@ import SettingsModal from './components/SettingsModal';
 import ResourcesModal from './components/ResourcesModal';
 import TodoListModal from './components/TodoListModal';
 import TodoListView from './components/TodoListView';
+import PomodoroWidget, {
+  requestNotificationPermission,
+  getPomodoroState,
+  savePomodoroState,
+  clearPomodoroState,
+  getPomodoroConfig,
+  savePomodoroConfig,
+  DEFAULT_POMODORO_CONFIG,
+  getPomodoroDurationOptions,
+  getEstimatedTargetMinutes,
+} from './components/PomodoroWidget';
 import WeeklyPlanner from './components/WeeklyPlanner';
 import * as DS from './services/dataService';
-import { encryptData, decryptData } from './auth/cryptoUtils';
+import { api } from './services/api';
+import {
+  setHttpLogUser,
+  getHttpLogs,
+  clearHttpLogs,
+  onHttpLog,
+} from './services/httpLogger';
 import {
   FaThLarge,
   FaChartLine,
@@ -42,7 +59,6 @@ function generateUUID() {
   });
 }
 
-// Función para limpiar actividades duplicadas
 const normalizeActivity = (activity = {}) => {
   const normalizedTags = Array.isArray(activity.tags)
     ? [...new Set(activity.tags.map(tag => String(tag || '').trim()).filter(Boolean))]
@@ -55,24 +71,80 @@ const normalizeActivity = (activity = {}) => {
 
   return {
     ...activity,
+    id: String(activity.id || ''),
+    dia: activity.dia || 'Lunes',
+    actividad: String(activity.actividad || '').trim(),
+    tipo: activity.tipo || 'Secundaria',
+    icono: activity.icono || '📝',
+    orden: Number.isFinite(Number(activity.orden)) ? Number(activity.orden) : 0,
+    completado: Boolean(activity.completado),
+    bloqueada: Boolean(activity.bloqueada),
     tags: normalizedTags,
-    targetMinutes: parseMinutes(activity.targetMinutes),
-    spentMinutes: parseMinutes(activity.spentMinutes),
-    pomodoroSessions: parseMinutes(activity.pomodoroSessions),
+    targetMinutes: parseMinutes(activity.targetMinutes ?? activity.target_minutes),
+    spentMinutes: parseMinutes(activity.spentMinutes ?? activity.spent_minutes),
+    pomodoroSessions: parseMinutes(activity.pomodoroSessions ?? activity.pomodoro_sessions),
+    kanbanStatus: activity.kanbanStatus || null,
+    semana: activity.semana || '',
+    updatedAt: activity.updatedAt || activity.updated_at || '',
+    createdAt: activity.createdAt || activity.created_at || '',
   };
+};
+
+const getActivityTimestamp = (activity) => {
+  const updated = Date.parse(activity?.updatedAt || activity?.updated_at || '');
+  if (Number.isFinite(updated)) return updated;
+  const created = Date.parse(activity?.createdAt || activity?.created_at || '');
+  if (Number.isFinite(created)) return created;
+  return 0;
+};
+
+const buildExactActivitySignature = (activity) => {
+  const normalized = normalizeActivity(activity);
+  return JSON.stringify({
+    dia: normalized.dia,
+    actividad: normalized.actividad,
+    tipo: normalized.tipo,
+    icono: normalized.icono,
+    completado: normalized.completado,
+    bloqueada: normalized.bloqueada,
+    orden: normalized.orden,
+    tags: normalized.tags,
+    targetMinutes: normalized.targetMinutes,
+    spentMinutes: normalized.spentMinutes,
+    pomodoroSessions: normalized.pomodoroSessions,
+    kanbanStatus: normalized.kanbanStatus || '',
+    semana: normalized.semana || '',
+  });
 };
 
 const cleanDuplicatedActivities = (activities) => {
   if (!Array.isArray(activities)) return [];
-  
-  const uniqueIds = new Set();
-  return activities.filter(activity => {
-    if (!activity || !activity.id) return false;
-    if (uniqueIds.has(activity.id)) return false;
-    
-    uniqueIds.add(activity.id);
-    return true;
-  }).map(normalizeActivity);
+
+  const byId = new Map();
+  activities.forEach((rawActivity) => {
+    if (!rawActivity || !rawActivity.id) return;
+    const normalized = normalizeActivity(rawActivity);
+    const existing = byId.get(normalized.id);
+    if (!existing || getActivityTimestamp(normalized) >= getActivityTimestamp(existing)) {
+      byId.set(normalized.id, normalized);
+    }
+  });
+
+  const bySignature = new Map();
+  Array.from(byId.values()).forEach((activity) => {
+    const signature = buildExactActivitySignature(activity);
+    const existing = bySignature.get(signature);
+    if (!existing || getActivityTimestamp(activity) >= getActivityTimestamp(existing)) {
+      bySignature.set(signature, activity);
+    }
+  });
+
+  return Array.from(bySignature.values()).sort((a, b) => {
+    const dayDiff = (DAY_ORDER_MAP[a.dia] ?? 99) - (DAY_ORDER_MAP[b.dia] ?? 99);
+    if (dayDiff !== 0) return dayDiff;
+    if (a.orden !== b.orden) return a.orden - b.orden;
+    return a.actividad.localeCompare(b.actividad);
+  });
 };
 
 const HISTORY_LIMIT = 50;
@@ -134,6 +206,27 @@ const DEFAULT_KANBAN_FILTER = {
 const DEFAULT_KANBAN_SORT = 'manual';
 
 const createLocalTodoId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const normalizeUsername = (value = '') => String(value || '').trim().toLowerCase();
+const PLAN_SYNC_META_STORAGE_PREFIX = 'planSyncMeta_';
+const DAY_ORDER_MAP = {
+  Lunes: 0,
+  Martes: 1,
+  Miércoles: 2,
+  Jueves: 3,
+  Viernes: 4,
+  Sábado: 5,
+  Domingo: 6,
+};
+
+const isUuid = (value = '') => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value));
+
+const cloneJson = (value, fallback) => {
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return fallback;
+  }
+};
 
 const getActivityKanbanStatus = (activity) => {
   if (!activity || typeof activity !== 'object') return 'todo';
@@ -247,6 +340,7 @@ export default function App() {
   
   // Hook para datos de usuario actual (clave depende del usuario)
   const [weeksData, setWeeksData] = useState({});
+  const [areWeeksLoaded, setAreWeeksLoaded] = useState(false);
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -307,7 +401,18 @@ export default function App() {
     status: 'todo',
   });
 
-  // Autologin desde Supabase session
+  const [pomodoroState, setPomodoroState] = useState(null);
+  const [pomodoroConfig, setPomodoroConfig] = useState(() => ({ ...DEFAULT_POMODORO_CONFIG }));
+  const [pomodoroStartSelector, setPomodoroStartSelector] = useState({
+    open: false,
+    activity: null,
+    options: []
+  });
+  const [httpLogs, setHttpLogs] = useState([]);
+  const [httpToasts, setHttpToasts] = useState([]);
+  const [planSyncMeta, setPlanSyncMeta] = useState({});
+  const [isSavingPlanId, setIsSavingPlanId] = useState(null);
+  const [settingsSection, setSettingsSection] = useState('activities');
   useEffect(() => {
     if (user) { setIsAuthLoading(false); return; }
     let mounted = true;
@@ -317,16 +422,16 @@ export default function App() {
         const { data: { session } } = await supabase.auth.getSession();
         if (session && mounted) {
           const email = session.user.email || '';
-          const username = email.replace('@studycart.app', '');
+          const username = normalizeUsername(email.replace('@studycart.app', ''));
           setUser({ username, supabaseId: session.user.id });
         } else if (mounted) {
           const lastUser = localStorage.getItem('lastLoggedUsername');
-          if (lastUser) setUser({ username: lastUser });
+          if (lastUser) setUser({ username: normalizeUsername(lastUser) });
         }
       } catch {
         if (mounted) {
           const lastUser = localStorage.getItem('lastLoggedUsername');
-          if (lastUser) setUser({ username: lastUser });
+          if (lastUser) setUser({ username: normalizeUsername(lastUser) });
         }
       }
       if (mounted) setIsAuthLoading(false);
@@ -335,46 +440,155 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadWeeksFromDB = useCallback(async () => {
-    if (!user?.username) { setWeeksData({}); return; }
+  const currentUserKey = normalizeUsername(user?.username);
+  const planSyncMetaStorageKey = currentUserKey
+    ? `${PLAN_SYNC_META_STORAGE_PREFIX}${currentUserKey}`
+    : '';
+
+  const pushToast = useCallback((toast) => {
+    if (!toast || !toast.title) return;
+    const nextToast = {
+      id: toast.id || `toast_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      type: toast.type || 'info',
+      title: toast.title,
+      message: toast.message || '',
+      actionLabel: toast.actionLabel || '',
+      action: typeof toast.action === 'function' ? toast.action : null,
+      duration: Number.isFinite(Number(toast.duration)) ? Number(toast.duration) : 7000,
+    };
+    setHttpToasts(prev => [nextToast, ...prev].slice(0, 4));
+  }, []);
+
+  const dismissToast = useCallback((toastId) => {
+    setHttpToasts(prev => prev.filter(toast => toast.id !== toastId));
+  }, []);
+
+  useEffect(() => {
+    setHttpLogUser(currentUserKey);
+  }, [currentUserKey]);
+
+  useEffect(() => {
+    const timers = httpToasts.map(toast => setTimeout(() => {
+      dismissToast(toast.id);
+    }, toast.duration));
+    return () => {
+      timers.forEach(timer => clearTimeout(timer));
+    };
+  }, [httpToasts, dismissToast]);
+
+  useEffect(() => {
+    if (!currentUserKey) {
+      setHttpLogs([]);
+      return;
+    }
+    setHttpLogs(getHttpLogs(currentUserKey));
+    const unsubscribe = onHttpLog((nextLogs, latestEntry) => {
+      if (Array.isArray(nextLogs)) setHttpLogs(nextLogs);
+      if (!latestEntry || latestEntry.ok) return;
+      pushToast({
+        type: 'error',
+        title: latestEntry.actionTitle || 'Petición fallida',
+        message: latestEntry.error?.detail || latestEntry.error || `${latestEntry.method} ${latestEntry.path}`,
+        actionLabel: 'Salió mal petición en backend',
+        action: () => {
+          setActiveSidebarSection('settings');
+          setShowSettingsModal(true);
+          setSettingsSection('logs');
+        },
+        duration: 9000,
+      });
+    });
+    return () => unsubscribe();
+  }, [currentUserKey, pushToast]);
+
+  useEffect(() => {
+    if (!planSyncMetaStorageKey) {
+      setPlanSyncMeta({});
+      return;
+    }
     try {
-      const dbWeeks = await DS.getWeeksInRange(user.username, '2000-01-01', '2099-12-31');
+      const parsed = JSON.parse(localStorage.getItem(planSyncMetaStorageKey) || '{}');
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        setPlanSyncMeta(parsed);
+      } else {
+        setPlanSyncMeta({});
+      }
+    } catch {
+      setPlanSyncMeta({});
+    }
+  }, [planSyncMetaStorageKey]);
+
+  useEffect(() => {
+    if (!planSyncMetaStorageKey) return;
+    localStorage.setItem(planSyncMetaStorageKey, JSON.stringify(planSyncMeta));
+  }, [planSyncMetaStorageKey, planSyncMeta]);
+
+  const handleClearHttpLogEntries = useCallback(() => {
+    clearHttpLogs(currentUserKey);
+    setHttpLogs([]);
+  }, [currentUserKey]);
+
+  const loadWeeksFromDB = useCallback(async () => {
+    setAreWeeksLoaded(false);
+    if (!currentUserKey) {
+      setWeeksData({});
+      setAreWeeksLoaded(true);
+      return;
+    }
+    try {
+      let dbWeeks = await DS.getWeeksInRange(currentUserKey, '2000-01-01', '2099-12-31');
+      if (dbWeeks.length === 0) {
+        dbWeeks = await DS.getWeeksInRangeCaseInsensitive(currentUserKey, '2000-01-01', '2099-12-31');
+      }
       const data = {};
       for (const w of dbWeeks) {
         const { all } = await DS.getWeekActivities(w.id);
-        data[w.week_start] = all.map(normalizeActivity);
+        const deduped = cleanDuplicatedActivities(all);
+        data[w.week_start] = deduped;
+        if (deduped.length !== all.length) {
+          await DS.replaceWeekActivities(w.id, deduped, w.week_start);
+        }
       }
       if (Object.keys(data).length === 0) {
-        const lsKey = `studyPlannerData_${user.username}`;
+        const lsKey = `studyPlannerData_${currentUserKey}`;
         const stored = localStorage.getItem(lsKey);
         if (stored) {
           try {
             const parsed = JSON.parse(stored);
             Object.entries(parsed).forEach(([wk, acts]) => { data[wk] = cleanDuplicatedActivities(acts); });
             if (Object.keys(data).length > 0) {
-              DS.importWeeksFromLocalStorage(data, user.username).catch(() => {});
+              DS.importWeeksFromLocalStorage(data, currentUserKey).catch(() => {});
             }
           } catch {}
         }
       }
       setWeeksData(data);
+      setAreWeeksLoaded(true);
     } catch (e) {
       console.error('Error loading weeks from IndexedDB:', e);
-      const lsKey = `studyPlannerData_${user.username}`;
+      const lsKey = `studyPlannerData_${currentUserKey}`;
       const stored = localStorage.getItem(lsKey);
       if (stored) {
-        try { setWeeksData(JSON.parse(stored)); } catch { setWeeksData({}); }
+        try {
+          const parsed = JSON.parse(stored);
+          const cleaned = {};
+          Object.entries(parsed || {}).forEach(([weekKey, activities]) => {
+            cleaned[weekKey] = cleanDuplicatedActivities(activities);
+          });
+          setWeeksData(cleaned);
+        } catch { setWeeksData({}); }
       } else { setWeeksData({}); }
+      setAreWeeksLoaded(true);
     }
-  }, [user?.username]);
+  }, [currentUserKey]);
 
   useEffect(() => { loadWeeksFromDB(); }, [loadWeeksFromDB]);
 
   useEffect(() => {
-    if (!user?.username || !currentWeek) { setNotes({}); return; }
+    if (!currentUserKey || !currentWeek) { setNotes({}); return; }
     (async () => {
       try {
-        const week = await DS.getWeek(user.username, currentWeek);
+        const week = await DS.getWeek(currentUserKey, currentWeek);
         if (week) {
           const noteMap = await DS.getWeekNotes(week.id);
           setNotes(noteMap);
@@ -383,7 +597,7 @@ export default function App() {
         }
       } catch { setNotes({}); }
     })();
-  }, [user?.username, currentWeek]);
+  }, [currentUserKey, currentWeek]);
 
   const refreshLegacyActivityTodos = async () => {
     try {
@@ -409,7 +623,7 @@ export default function App() {
 
   // Cargar todo list global por usuario + legacy activity todos
   useEffect(() => {
-    if (!user?.username) {
+    if (!currentUserKey) {
       setGlobalTodos([]);
       setGlobalTodoInput('');
       setGlobalTodosReady(false);
@@ -424,21 +638,21 @@ export default function App() {
 
     (async () => {
       try {
-        let dbTodos = await DS.getGlobalTodos(user.username);
+        let dbTodos = await DS.getGlobalTodos(currentUserKey);
         if (dbTodos.length === 0) {
-          const todoStorageKey = `${GLOBAL_TODO_STORAGE_PREFIX}${user.username}`;
+          const todoStorageKey = `${GLOBAL_TODO_STORAGE_PREFIX}${currentUserKey}`;
           const lsRaw = localStorage.getItem(todoStorageKey);
           if (lsRaw) {
             const lsTodos = parseGlobalTodos(lsRaw);
             if (lsTodos.length > 0) {
-              await DS.importGlobalTodosFromLocalStorage(user.username, lsTodos);
-              dbTodos = await DS.getGlobalTodos(user.username);
+              await DS.importGlobalTodosFromLocalStorage(currentUserKey, lsTodos);
+              dbTodos = await DS.getGlobalTodos(currentUserKey);
             }
           }
         }
         setGlobalTodos(dbTodos.map(normalizeGlobalTodo).filter(Boolean));
       } catch {
-        const todoStorageKey = `${GLOBAL_TODO_STORAGE_PREFIX}${user.username}`;
+        const todoStorageKey = `${GLOBAL_TODO_STORAGE_PREFIX}${currentUserKey}`;
         setGlobalTodos(parseGlobalTodos(localStorage.getItem(todoStorageKey)));
       }
       setGlobalTodosReady(true);
@@ -471,13 +685,13 @@ export default function App() {
         }
       }
     })();
-  }, [user?.username]);
+  }, [currentUserKey]);
 
   // Persistir global todos a IndexedDB
   useEffect(() => {
-    if (!user?.username || !globalTodosReady) return;
-    DS.saveGlobalTodos(user.username, globalTodos).catch(() => {});
-  }, [globalTodos, user?.username, globalTodosReady]);
+    if (!currentUserKey || !globalTodosReady) return;
+    DS.saveGlobalTodos(currentUserKey, globalTodos).catch(() => {});
+  }, [globalTodos, currentUserKey, globalTodosReady]);
 
   // Rehidratar summary de activity todos cuando cambia foco de ventana o storage
   useEffect(() => {
@@ -494,10 +708,147 @@ export default function App() {
   const [activePlanId, setActivePlanId] = useState(null);
   const DAYS_LIST = useMemo(() => ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'], []);
 
+  const updatePlanSyncMeta = useCallback((planId, patch) => {
+    if (!planId || !patch || typeof patch !== 'object') return;
+    setPlanSyncMeta(prev => {
+      const previous = prev[planId] || {};
+      return {
+        ...prev,
+        [planId]: {
+          ...previous,
+          ...patch,
+        }
+      };
+    });
+  }, []);
+
+  const getPlanSyncState = useCallback((planId) => {
+    if (!planId || planId === 'plan_default') return 'default';
+    const meta = planSyncMeta[planId] || {};
+    if (meta.pendingSync || meta.lastError) return 'error';
+    if (meta.origin === 'cloud' || meta.cloudPlanId) return 'cloud';
+    return 'local';
+  }, [planSyncMeta]);
+
+  const createEmptyPlanWeek = useCallback(() => {
+    return DAYS_LIST.reduce((acc, day) => ({ ...acc, [day]: [] }), {});
+  }, [DAYS_LIST]);
+
+  const normalizePlanActivitiesByDay = useCallback((activitiesByDay = {}) => {
+    const normalized = createEmptyPlanWeek();
+    DAYS_LIST.forEach((day) => {
+      const list = Array.isArray(activitiesByDay?.[day]) ? activitiesByDay[day] : [];
+      normalized[day] = list.map((activity, index) => {
+        const normalizedActivity = normalizeActivity({
+          ...activity,
+          dia: day,
+          icono: activity?.icono || TYPE_ICON_MAP[activity?.tipo] || '📝',
+          tags: Array.isArray(activity?.tags) ? activity.tags : [],
+          targetMinutes: activity?.targetMinutes ?? activity?.target_minutes ?? 0,
+          spentMinutes: activity?.spentMinutes ?? activity?.spent_minutes ?? 0,
+          pomodoroSessions: activity?.pomodoroSessions ?? activity?.pomodoro_sessions ?? 0,
+          completado: Boolean(activity?.completado),
+          bloqueada: Boolean(activity?.bloqueada),
+          orden: Number.isFinite(Number(activity?.orden)) ? Number(activity.orden) : index
+        });
+        return {
+          ...normalizedActivity,
+          id: normalizedActivity.id || `plan-${day}-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 6)}`
+        };
+      });
+    });
+    return normalized;
+  }, [DAYS_LIST, createEmptyPlanWeek]);
+
+  const flattenPlanActivities = useCallback((planId, activitiesByDay = {}) => {
+    const payload = [];
+    DAYS_LIST.forEach((day) => {
+      const dayActivities = Array.isArray(activitiesByDay?.[day]) ? activitiesByDay[day] : [];
+      dayActivities.forEach((activity, index) => {
+        if (!activity?.actividad) return;
+        payload.push({
+          id: activity.id || `${planId}-${day}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+          plan_id: planId,
+          dia: day,
+          actividad: String(activity.actividad || '').trim(),
+          tipo: activity.tipo || 'Secundaria',
+          icono: activity.icono || TYPE_ICON_MAP[activity.tipo] || '📝',
+          orden: Number.isFinite(Number(activity.orden)) ? Number(activity.orden) : index,
+          tags: Array.isArray(activity.tags) ? activity.tags : [],
+          target_minutes: Number(activity.targetMinutes ?? activity.target_minutes ?? 0) || 0
+        });
+      });
+    });
+    return payload;
+  }, [DAYS_LIST]);
+
+  const pullCloudPlansIntoLocal = useCallback(async () => {
+    if (!currentUserKey || !user?.supabaseId) return [];
+    const remotePlans = await api.get('/plans', {
+      actionTitle: 'Planes recuperados de la nube'
+    });
+    if (!Array.isArray(remotePlans) || remotePlans.length === 0) return [];
+
+    const hydratedPlans = [];
+    for (const remotePlan of remotePlans) {
+      const grouped = await api.get(`/plans/${remotePlan.id}/activities`, {
+        actionTitle: `Actividades recuperadas: ${remotePlan.name || 'Plan'}`
+      });
+      const activitiesByDay = {};
+      DAYS_LIST.forEach((day) => {
+        const remoteActivities = Array.isArray(grouped?.[day]) ? grouped[day] : [];
+        activitiesByDay[day] = remoteActivities.map((activity, index) => normalizeActivity({
+          id: activity.id,
+          dia: day,
+          actividad: activity.actividad,
+          tipo: activity.tipo,
+          icono: activity.icono || TYPE_ICON_MAP[activity.tipo] || '📝',
+          orden: Number.isFinite(Number(activity.orden)) ? Number(activity.orden) : index,
+          tags: Array.isArray(activity.tags) ? activity.tags : [],
+          targetMinutes: activity.target_minutes || 0,
+          spentMinutes: 0,
+          pomodoroSessions: 0,
+          completado: false,
+          bloqueada: false,
+          createdAt: activity.created_at || '',
+          updatedAt: activity.updated_at || '',
+        }));
+      });
+
+      let localPlan = await DS.getPlan(remotePlan.id);
+      if (!localPlan) {
+        localPlan = await DS.createPlan(remotePlan.name || 'Plan', false, remotePlan.id, currentUserKey);
+      } else {
+        await DS.updatePlan(remotePlan.id, { name: remotePlan.name || localPlan.name });
+      }
+
+      await DS.replacePlanActivities(remotePlan.id, activitiesByDay);
+      hydratedPlans.push({
+        id: remotePlan.id,
+        name: remotePlan.name || 'Plan',
+        createdAt: remotePlan.created_at || localPlan?.created_at || new Date().toISOString(),
+        isDefault: Boolean(remotePlan.is_default),
+        activities: activitiesByDay,
+      });
+
+      updatePlanSyncMeta(remotePlan.id, {
+        origin: 'cloud',
+        cloudPlanId: remotePlan.id,
+        lastSyncedAt: new Date().toISOString(),
+        lastError: null,
+        pendingSync: false,
+      });
+    }
+    return hydratedPlans;
+  }, [DAYS_LIST, currentUserKey, updatePlanSyncMeta, user?.supabaseId]);
+
   const loadPlansFromDB = useCallback(async () => {
-    if (!user?.username) { setStudyPlans([]); setActivePlanId(null); return; }
+    if (!currentUserKey) { setStudyPlans([]); setActivePlanId(null); return; }
     try {
-      const dbPlans = await DS.getAllPlans();
+      let dbPlans = await DS.getAllPlans(currentUserKey);
+      if (dbPlans.length === 0) {
+        dbPlans = await DS.getAllPlansCaseInsensitive(currentUserKey);
+      }
       let plans = dbPlans;
       const hasDefault = plans.some(p => p.id === 'plan_default');
       if (!hasDefault) {
@@ -519,7 +870,7 @@ export default function App() {
           }));
         });
         const defaultPlan = { id: 'plan_default', name: 'Plan default', createdAt: '2025-01-01T00:00:00.000Z', activities: defaultPlanActivities, isDefault: true };
-        await DS.createPlan('Plan default', true, 'plan_default');
+        await DS.createPlan('Plan default', true, 'plan_default', currentUserKey);
         for (const [dia, acts] of Object.entries(defaultPlanActivities)) {
           for (const act of acts) {
             await DS.addPlanActivity('plan_default', { ...act, dia });
@@ -535,32 +886,81 @@ export default function App() {
       }
 
       if (plans.length === 0) {
-        const lsKey = `studyPlans_${user.username}`;
+        const lsKey = `studyPlans_${currentUserKey}`;
         const stored = localStorage.getItem(lsKey);
         if (stored) {
           try {
             const parsed = JSON.parse(stored);
             plans = parsed.plans || [];
             if (plans.length > 0) {
-              await DS.importPlansFromLocalStorage(plans, parsed.activePlanId, user.username);
-              if (parsed.activePlanId) await DS.setActivePlanId(user.username, parsed.activePlanId);
+              await DS.importPlansFromLocalStorage(plans, parsed.activePlanId, currentUserKey);
+              if (parsed.activePlanId) await DS.setActivePlanId(currentUserKey, parsed.activePlanId);
             }
           } catch {}
         }
       }
 
-      setStudyPlans(plans);
-      const activeId = await DS.getActivePlanId(user.username);
-      if (activeId && plans.some(p => p.id === activeId)) {
+      const canUseCloud = Boolean(user?.supabaseId);
+      const shouldPullFromCloud = canUseCloud && (plans.length === 0 || (
+        plans.length === 1 && plans[0].id === 'plan_default'
+      ));
+      if (shouldPullFromCloud) {
+        try {
+          const cloudPlans = await pullCloudPlansIntoLocal();
+          if (cloudPlans.length > 0) {
+            const localDefault = plans.find(plan => plan.id === 'plan_default');
+            const merged = [];
+            if (localDefault) merged.push(localDefault);
+            cloudPlans.forEach((plan) => {
+              if (!merged.some(item => item.id === plan.id)) {
+                merged.push(plan);
+              }
+            });
+            plans = merged;
+          }
+        } catch {}
+      }
+
+      for (const plan of plans) {
+        if (!plan.activities) {
+          plan.activities = await DS.getPlanActivities(plan.id);
+        }
+      }
+
+      const normalizedPlans = plans.map((plan) => ({
+        ...plan,
+        isDefault: Boolean(plan.isDefault || plan.is_default || plan.id === 'plan_default'),
+      }));
+
+      setStudyPlans(normalizedPlans);
+      setPlanSyncMeta((prev) => {
+        const next = { ...prev };
+        normalizedPlans.forEach((plan) => {
+          if (plan.id === 'plan_default') return;
+          const existing = next[plan.id] || {};
+          next[plan.id] = {
+            origin: existing.origin || (isUuid(plan.id) ? 'cloud' : 'local'),
+            cloudPlanId: existing.cloudPlanId || (isUuid(plan.id) ? plan.id : null),
+            lastSyncedAt: existing.lastSyncedAt || null,
+            lastError: existing.lastError || null,
+            pendingSync: Boolean(existing.pendingSync),
+          };
+        });
+        return next;
+      });
+
+      const activeId = await DS.getActivePlanId(currentUserKey);
+      if (activeId && normalizedPlans.some(p => p.id === activeId)) {
         setActivePlanId(activeId);
-      } else if (plans.length > 0) {
-        setActivePlanId(plans[0].id);
+      } else if (normalizedPlans.length > 0) {
+        const cloudFirst = normalizedPlans.find(plan => plan.id !== 'plan_default');
+        setActivePlanId((cloudFirst || normalizedPlans[0]).id);
       } else {
         setActivePlanId(null);
       }
     } catch (e) {
       console.error('Error loading plans from IndexedDB:', e);
-      const lsKey = `studyPlans_${user.username}`;
+      const lsKey = `studyPlans_${currentUserKey}`;
       const stored = localStorage.getItem(lsKey);
       if (stored) {
         try {
@@ -570,9 +970,14 @@ export default function App() {
         } catch { setStudyPlans([]); setActivePlanId(null); }
       } else { setStudyPlans([]); setActivePlanId(null); }
     }
-  }, [user?.username, DAYS_LIST]);
+  }, [currentUserKey, DAYS_LIST, pullCloudPlansIntoLocal, user?.supabaseId]);
 
   useEffect(() => { loadPlansFromDB(); }, [loadPlansFromDB]);
+
+  useEffect(() => {
+    if (!currentUserKey) return;
+    DS.setActivePlanId(currentUserKey, activePlanId || null).catch(() => {});
+  }, [currentUserKey, activePlanId]);
 
   // CRUD de planes
   const handleCreatePlan = async (planId, name) => {
@@ -581,11 +986,28 @@ export default function App() {
     const newPlan = { id: planId, name, createdAt: new Date().toISOString(), activities: emptyActivities };
     setStudyPlans(prev => [...prev, newPlan]);
     setActivePlanId(planId);
-    try { await DS.createPlan(name, false); await DS.setActivePlanId(user?.username, planId); } catch {}
+    updatePlanSyncMeta(planId, {
+      origin: 'local',
+      cloudPlanId: null,
+      lastSyncedAt: null,
+      lastError: null,
+      pendingSync: false,
+    });
+    try {
+      await DS.createPlan(name, false, planId, currentUserKey);
+      await DS.setActivePlanId(currentUserKey, planId);
+      await DS.replacePlanActivities(planId, emptyActivities);
+    } catch {}
   };
 
   const handleDeletePlan = async (planId) => {
     if (planId === 'plan_default') return;
+    setPlanSyncMeta(prev => {
+      if (!prev[planId]) return prev;
+      const next = { ...prev };
+      delete next[planId];
+      return next;
+    });
     setStudyPlans(prev => {
       const updated = prev.filter(p => p.id !== planId);
       if (activePlanId === planId) {
@@ -602,7 +1024,7 @@ export default function App() {
   };
 
   const handleAddActivityToPlan = async (planId, activity) => {
-    setStudyPlans(prev => prev.map(p => {
+    const nextPlans = studyPlans.map(p => {
       if (p.id !== planId) return p;
       const dayActivities = p.activities[activity.dia] || [];
       return {
@@ -612,12 +1034,18 @@ export default function App() {
           [activity.dia]: [...dayActivities, activity],
         },
       };
-    }));
-    try { await DS.addPlanActivity(planId, activity); } catch {}
+    });
+    setStudyPlans(nextPlans);
+    const updatedPlan = nextPlans.find(p => p.id === planId);
+    try {
+      if (updatedPlan) {
+        await DS.replacePlanActivities(planId, updatedPlan.activities);
+      }
+    } catch {}
   };
 
   const handleDeleteActivityFromPlan = async (planId, day, activityId) => {
-    setStudyPlans(prev => prev.map(p => {
+    const nextPlans = studyPlans.map(p => {
       if (p.id !== planId) return p;
       return {
         ...p,
@@ -626,104 +1054,288 @@ export default function App() {
           [day]: (p.activities[day] || []).filter(a => a.id !== activityId),
         },
       };
-    }));
-    try { await DS.deletePlanActivity(activityId); } catch {}
+    });
+    setStudyPlans(nextPlans);
+    const updatedPlan = nextPlans.find(p => p.id === planId);
+    try {
+      if (updatedPlan) {
+        await DS.replacePlanActivities(planId, updatedPlan.activities);
+      }
+    } catch {}
   };
 
   const handleUpdateActivityInPlan = async (planId, updates) => {
-    setStudyPlans(prev => {
-      const plan = prev.find(p => p.id === planId);
-      if (!plan) return prev;
+    const plan = studyPlans.find(p => p.id === planId);
+    if (!plan) return;
 
-      const newPlans = prev.map(p => {
-        if (p.id !== planId) return p;
+    const newPlans = studyPlans.map(p => {
+      if (p.id !== planId) return p;
 
-        const newActivities = { ...p.activities };
+      const newActivities = { ...p.activities };
 
-        updates.forEach(({ action, day, activityId, activity }) => {
-          if (action === 'delete') {
-            newActivities[day] = (newActivities[day] || []).filter(a => a.id !== activityId);
-          } else if (action === 'update') {
-            const targetDay = day || activity?.dia;
-            if (!targetDay) return;
-            newActivities[targetDay] = (newActivities[targetDay] || []).map(a =>
-              a.id === activityId ? { ...a, ...activity, id: activityId, dia: targetDay } : a
-            );
-          } else if (action === 'add') {
-            const targetDay = day || activity?.dia;
-            if (!targetDay || !activity) return;
-            const dayActs = newActivities[targetDay] || [];
-            const activityToAdd = { ...activity, dia: targetDay };
-            newActivities[targetDay] = [...dayActs, activityToAdd];
-          }
-        });
-
-        return { ...p, activities: newActivities };
+      updates.forEach(({ action, day, activityId, activity }) => {
+        if (action === 'delete') {
+          newActivities[day] = (newActivities[day] || []).filter(a => a.id !== activityId);
+        } else if (action === 'update') {
+          const targetDay = day || activity?.dia;
+          if (!targetDay) return;
+          newActivities[targetDay] = (newActivities[targetDay] || []).map(a =>
+            a.id === activityId ? { ...a, ...activity, id: activityId, dia: targetDay } : a
+          );
+        } else if (action === 'add') {
+          const targetDay = day || activity?.dia;
+          if (!targetDay || !activity) return;
+          const dayActs = newActivities[targetDay] || [];
+          const activityToAdd = { ...activity, dia: targetDay };
+          newActivities[targetDay] = [...dayActs, activityToAdd];
+        }
       });
 
-      return newPlans;
+      return { ...p, activities: newActivities };
     });
+
+    setStudyPlans(newPlans);
+    const updatedPlan = newPlans.find(p => p.id === planId);
     try {
-      for (const u of updates) {
-        if (u.action === 'delete') await DS.deletePlanActivity(u.activityId);
-        else if (u.action === 'update') await DS.updatePlanActivity(u.activityId, u.activity || {});
-        else if (u.action === 'add') await DS.addPlanActivity(planId, { ...u.activity, dia: u.day || u.activity?.dia });
+      if (updatedPlan) {
+        await DS.replacePlanActivities(planId, updatedPlan.activities);
       }
     } catch {}
   };
 
   const handleCopyFromPlan = async (targetPlanId, sourcePlanId) => {
-    setStudyPlans(prev => {
-      const source = prev.find(p => p.id === sourcePlanId);
-      if (!source) return prev;
-      const copiedActivities = {};
-      DAYS_LIST.forEach(d => {
-        copiedActivities[d] = (source.activities[d] || []).map(act => ({
-          ...act,
-          id: `plan-${d}-${act.actividad.trim().toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
-        }));
-      });
-      return prev.map(p => {
-        if (p.id !== targetPlanId) return p;
-        return { ...p, activities: copiedActivities };
-      });
+    const source = studyPlans.find(p => p.id === sourcePlanId);
+    if (!source) return;
+
+    const copiedActivities = {};
+    DAYS_LIST.forEach(d => {
+      copiedActivities[d] = (source.activities[d] || []).map(act => ({
+        ...act,
+        id: `plan-${d}-${act.actividad.trim().toLowerCase().replace(/\s+/g, '-')}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      }));
     });
-    try { await DS.copyPlanActivities(targetPlanId, sourcePlanId); } catch {}
+
+    const nextPlans = studyPlans.map(p => {
+      if (p.id !== targetPlanId) return p;
+      return { ...p, activities: copiedActivities };
+    });
+    setStudyPlans(nextPlans);
+
+    try {
+      await DS.replacePlanActivities(targetPlanId, copiedActivities);
+    } catch {}
   };
 
-  // eslint-disable-next-line
-  const getActivePlan = () => studyPlans.find(p => p.id === activePlanId) || null;
+  const replaceRemotePlanActivities = useCallback(async (cloudPlanId, activitiesByDay) => {
+    const existingGrouped = await api.get(`/plans/${cloudPlanId}/activities`, {
+      actionTitle: 'Actividades remotas consultadas'
+    });
+    const existing = Object.values(existingGrouped || {}).flat();
 
-  // eslint-disable-next-line
-  const saveCredentials = async (username, password) => {
-    try {
-      const encrypted = await encryptData(JSON.stringify({ username }), password);
-      localStorage.setItem('userCredentials', JSON.stringify(encrypted));
-      setUser({ username });
-      setLoginError('');
-    } catch (error) {
-      setLoginError('Error al guardar credenciales');
-      console.error(error);
+    for (const activity of existing) {
+      if (!activity?.id) continue;
+      await api.delete(`/plans/${cloudPlanId}/activities/${activity.id}`, {
+        actionTitle: 'Actividad remota eliminada'
+      });
     }
-  };
 
-  // eslint-disable-next-line
-  const loadCredentials = async (password) => {
-    try {
-      const encrypted = JSON.parse(localStorage.getItem('userCredentials'));
-      if (!encrypted) return null;
-      
-      const data = await decryptData(encrypted, password);
-      return JSON.parse(data);
-    } catch (error) {
-      setLoginError('Credenciales inválidas');
-      return null;
+    const payloadActivities = flattenPlanActivities(cloudPlanId, activitiesByDay);
+    for (const activity of payloadActivities) {
+      await api.post(`/plans/${cloudPlanId}/activities`, {
+        dia: activity.dia,
+        actividad: activity.actividad,
+        tipo: activity.tipo,
+        icono: activity.icono,
+        orden: activity.orden,
+        tags: activity.tags,
+      }, {
+        actionTitle: 'Actividad remota creada'
+      });
     }
+  }, [flattenPlanActivities]);
+
+  const handleSavePlanToCloud = useCallback(async (planId) => {
+    const targetPlan = studyPlans.find(plan => plan.id === planId);
+    if (!targetPlan || !currentUserKey) return false;
+    if (!user?.supabaseId) {
+      pushToast({
+        type: 'info',
+        title: 'Guardado en nube no disponible',
+        message: 'Inicia sesión en Supabase para sincronizar con backend. Tu plan ya está guardado localmente.',
+        duration: 6500,
+      });
+      return false;
+    }
+    if (targetPlan.id === 'plan_default') {
+      pushToast({
+        type: 'info',
+        title: 'El plan default no se guarda en nube',
+        message: 'Crea un plan personalizado para sincronizarlo con backend.',
+        duration: 5000,
+      });
+      return false;
+    }
+
+    setIsSavingPlanId(planId);
+    try {
+      await api.post('/auth/profile', {}, { actionTitle: 'Perfil verificado' });
+
+      const currentMeta = planSyncMeta[planId] || {};
+      let cloudPlanId = currentMeta.cloudPlanId || null;
+
+      if (!cloudPlanId) {
+        const createdPlan = await api.post('/plans', {
+          name: targetPlan.name || 'Plan de estudios'
+        }, {
+          actionTitle: 'Plan de estudios guardado con éxito'
+        });
+        cloudPlanId = createdPlan?.id || null;
+      } else {
+        await api.put(`/plans/${cloudPlanId}`, {
+          name: targetPlan.name || 'Plan de estudios'
+        }, {
+          actionTitle: 'Plan de estudios guardado con éxito'
+        });
+      }
+
+      if (!cloudPlanId) {
+        throw new Error('No se obtuvo un id de plan en backend.');
+      }
+
+      const normalizedActivities = normalizePlanActivitiesByDay(targetPlan.activities || {});
+      await replaceRemotePlanActivities(cloudPlanId, normalizedActivities);
+
+      updatePlanSyncMeta(planId, {
+        origin: 'cloud',
+        cloudPlanId,
+        lastSyncedAt: new Date().toISOString(),
+        lastError: null,
+        pendingSync: false,
+      });
+
+      pushToast({
+        type: 'success',
+        title: 'Plan de estudios guardado con éxito',
+        message: `${targetPlan.name} quedó sincronizado con la nube.`,
+        duration: 6000,
+      });
+      return true;
+    } catch (error) {
+      updatePlanSyncMeta(planId, {
+        origin: 'local',
+        lastError: error?.message || 'Error de sincronización',
+        pendingSync: true,
+      });
+
+      pushToast({
+        type: 'error',
+        title: 'No se pudo guardar el plan',
+        message: error?.message || 'Falló la petición al backend.',
+        actionLabel: 'Salió mal petición en backend',
+        action: () => {
+          setActiveSidebarSection('settings');
+          setShowSettingsModal(true);
+          setSettingsSection('logs');
+        },
+        duration: 9000,
+      });
+      return false;
+    } finally {
+      setIsSavingPlanId(null);
+    }
+  }, [
+    currentUserKey,
+    normalizePlanActivitiesByDay,
+    planSyncMeta,
+    pushToast,
+    replaceRemotePlanActivities,
+    studyPlans,
+    updatePlanSyncMeta,
+    user?.supabaseId
+  ]);
+
+  useEffect(() => {
+    if (!currentUserKey) return undefined;
+    const handleOnline = () => {
+      const pendingPlans = Object.entries(planSyncMeta)
+        .filter(([, meta]) => meta?.pendingSync)
+        .map(([planId]) => planId);
+      pendingPlans.forEach((planId) => {
+        handleSavePlanToCloud(planId).catch(() => {});
+      });
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [currentUserKey, planSyncMeta, handleSavePlanToCloud]);
+
+  const handleImportPlanToActive = async (planId, payload) => {
+    const targetPlan = studyPlans.find(plan => plan.id === planId);
+    if (!targetPlan) return false;
+
+    const normalizedActivities = normalizePlanActivitiesByDay(payload?.activitiesByDay || {});
+    const nextName = String(payload?.name || '').trim();
+
+    setStudyPlans(prev => prev.map(plan => (
+      plan.id === planId
+        ? {
+            ...plan,
+            name: nextName || plan.name,
+            activities: normalizedActivities
+          }
+        : plan
+    )));
+
+    try {
+      if (nextName && nextName !== targetPlan.name) {
+        await DS.updatePlan(planId, { name: nextName });
+      }
+      await DS.replacePlanActivities(planId, normalizedActivities);
+    } catch {}
+
+    updatePlanSyncMeta(planId, {
+      origin: 'local',
+      pendingSync: true,
+      lastError: null,
+    });
+
+    if (payload?.applyToVisibleWeek && currentWeek) {
+      const importedWeekActivities = DAYS_LIST.flatMap((day) => (
+        (normalizedActivities[day] || []).map((activity, index) => normalizeActivity({
+          ...activity,
+          id: `${currentWeek}-${day}-${activity.actividad}-${index}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          dia: day,
+          semana: currentWeek,
+          completado: false,
+          bloqueada: false,
+          spentMinutes: 0,
+          pomodoroSessions: 0,
+          orden: Number.isFinite(Number(activity.orden)) ? Number(activity.orden) : index,
+        }))
+      ));
+
+      const dedupedWeek = cleanDuplicatedActivities(importedWeekActivities);
+      setWeeksDataWithHistory(prev => ({
+        ...prev,
+        [currentWeek]: dedupedWeek
+      }));
+      persistWeekActivities(currentWeek, dedupedWeek);
+    }
+
+    pushToast({
+      type: 'success',
+      title: 'Plan importado con éxito',
+      message: payload?.applyToVisibleWeek
+        ? 'El plan se aplicó al planificador y a la semana visible.'
+        : 'El plan quedó actualizado localmente.',
+      duration: 6000,
+    });
+    return true;
   };
 
   const handleLogin = async (username, mode = 'login') => {
-    const email = `${username}@studycart.app`;
-    const password = `${username}_studycart_${username.length}`;
+    const normalizedUsername = normalizeUsername(username);
+    const email = `${normalizedUsername}@studycart.app`;
+    const password = `${normalizedUsername}_studycart_${normalizedUsername.length}`;
     try {
       const supabase = (await import('./services/supabaseClient')).default;
       if (mode === 'register') {
@@ -747,7 +1359,7 @@ export default function App() {
           if (error.message.includes('Invalid login')) {
             setLoginError('Usuario no encontrado. ¿Quieres crear una cuenta?');
             setAuthMode('register');
-            setPendingUsername(username);
+            setPendingUsername(normalizedUsername);
             return;
           }
           if (error.message.includes('rate limit') || error.message.includes('network') || error.message.includes('fetch')) {
@@ -762,9 +1374,9 @@ export default function App() {
       // offline - fall through
     }
 
-    localStorage.setItem('lastLoggedUsername', username);
+    localStorage.setItem('lastLoggedUsername', normalizedUsername);
     localStorage.setItem('hasHadUser', 'true');
-    setUser({ username });
+    setUser({ username: normalizedUsername });
     setLoginError('');
   }; 
 
@@ -777,50 +1389,55 @@ export default function App() {
   };
 
 
+  const initializeWeekRef = useRef(false);
+
   useEffect(() => {
+    initializeWeekRef.current = false;
+  }, [currentWeek]);
+
+  useEffect(() => {
+    if (!currentUserKey || !currentWeek) return;
+    if (!areWeeksLoaded) return;
+    if (initializeWeekRef.current) return;
+    if (weeksData[currentWeek] && weeksData[currentWeek].length > 0) return;
+    if (!activePlanId || studyPlans.length === 0) return;
+    initializeWeekRef.current = true;
+
     const initializeWeek = async () => {
-      if (!user?.username) return;
-      if (weeksData[currentWeek] && weeksData[currentWeek].length > 0) return;
       try {
-        const week = await DS.getWeek(user.username, currentWeek);
+        const week = await DS.getWeek(currentUserKey, currentWeek);
         if (week) {
           const { all } = await DS.getWeekActivities(week.id);
           if (all.length > 0) {
-            setWeeksData(prev => ({ ...prev, [currentWeek]: all.map(normalizeActivity) }));
+            const deduped = cleanDuplicatedActivities(all);
+            if (deduped.length !== all.length) {
+              await DS.replaceWeekActivities(week.id, deduped, currentWeek);
+            }
+            setWeeksData(prev => ({ ...prev, [currentWeek]: deduped }));
             return;
           }
         }
         const activePlan = studyPlans.find(p => p.id === activePlanId);
         if (activePlan?.activities) {
-          const planActivities = Object.entries(activePlan.activities).flatMap(([day, acts]) =>
-            (Array.isArray(acts) ? acts : []).map(act => ({
-              ...act, semana: currentWeek, dia: day,
-              id: `${currentWeek}-${day}-${act.actividad}`.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
-              completado: false,
-            })).map(normalizeActivity)
-          );
-          await DS.deployPlanToWeek(user.username, currentWeek, activePlanId);
-          setWeeksData(prev => ({ ...prev, [currentWeek]: planActivities }));
+          await DS.deployPlanToWeek(currentUserKey, currentWeek, activePlanId);
+          const deployedWeek = await DS.getWeek(currentUserKey, currentWeek);
+          if (deployedWeek) {
+            const { all } = await DS.getWeekActivities(deployedWeek.id);
+            const deduped = cleanDuplicatedActivities(all);
+            if (deduped.length !== all.length) {
+              await DS.replaceWeekActivities(deployedWeek.id, deduped, currentWeek);
+            }
+            setWeeksData(prev => ({ ...prev, [currentWeek]: deduped }));
+          }
         }
-      } catch { console.error('Error initializing week'); }
+      } catch {
+        console.error('Error initializing week');
+        initializeWeekRef.current = false;
+      }
     };
     initializeWeek();
-  }, [currentWeek, weeksData, setWeeksData, user, studyPlans, activePlanId]);
-
-  useEffect(() => {
-    if (!user?.username || !activePlanId || !currentWeek) return;
-    const activePlan = studyPlans.find(p => p.id === activePlanId);
-    if (!activePlan?.activities) return;
-    const planActivities = Object.entries(activePlan.activities).flatMap(([day, acts]) =>
-      (Array.isArray(acts) ? acts : []).map(act => ({
-        ...act, semana: currentWeek, dia: day,
-        id: `${currentWeek}-${day}-${act.actividad}`.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
-        completado: false,
-      })).map(normalizeActivity)
-    );
-    DS.deployPlanToWeek(user.username, currentWeek, activePlanId).catch(() => {});
-    setWeeksData(prev => ({ ...prev, [currentWeek]: planActivities }));
-  }, [activePlanId, currentWeek, studyPlans, user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentWeek, currentUserKey, studyPlans, activePlanId, areWeeksLoaded, weeksData]);
 
   const currentWeekData = useMemo(
     () => (Array.isArray(weeksData[currentWeek]) ? weeksData[currentWeek] : []),
@@ -874,6 +1491,334 @@ export default function App() {
         return (a.activity?.actividad || '').localeCompare(b.activity?.actividad || '');
       });
   }, [activityTodosMap, activitiesById]);
+
+  useEffect(() => {
+    requestNotificationPermission();
+    const savedConfig = getPomodoroConfig();
+    setPomodoroConfig(savedConfig);
+    const saved = getPomodoroState();
+    if (saved) {
+      const mergedSaved = {
+        ...saved,
+        workDuration: Number(saved.workDuration || savedConfig.workDuration || DEFAULT_POMODORO_CONFIG.workDuration),
+        breakDuration: Number(saved.breakDuration || savedConfig.breakDuration || DEFAULT_POMODORO_CONFIG.breakDuration),
+        longBreakDuration: Number(saved.longBreakDuration || savedConfig.longBreakDuration || DEFAULT_POMODORO_CONFIG.longBreakDuration),
+        sessionsBeforeLongBreak: Number(saved.sessionsBeforeLongBreak || savedConfig.sessionsBeforeLongBreak || DEFAULT_POMODORO_CONFIG.sessionsBeforeLongBreak),
+      };
+      if (saved.pausedAt) {
+        setPomodoroState(mergedSaved);
+      } else {
+        const startedAt = new Date(mergedSaved.startedAt).getTime();
+        const duration = (
+          mergedSaved.phase === 'work'
+            ? (mergedSaved.workDuration || savedConfig.workDuration || DEFAULT_POMODORO_CONFIG.workDuration)
+            : mergedSaved.phase === 'break'
+              ? (mergedSaved.breakDuration || savedConfig.breakDuration || DEFAULT_POMODORO_CONFIG.breakDuration)
+              : (mergedSaved.longBreakDuration || savedConfig.longBreakDuration || DEFAULT_POMODORO_CONFIG.longBreakDuration)
+        ) * 60;
+        const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+        if (elapsed >= duration) {
+          const completedState = { ...mergedSaved, pausedAt: new Date().toISOString(), remaining: 0 };
+          setPomodoroState(completedState);
+          savePomodoroState(completedState);
+        } else {
+          const pausedState = { ...mergedSaved, pausedAt: new Date().toISOString(), remaining: duration - elapsed };
+          setPomodoroState(pausedState);
+          savePomodoroState(pausedState);
+        }
+      }
+    }
+  }, []);
+
+  const handleUpdatePomodoroConfig = useCallback((patch = {}) => {
+    if (!patch || typeof patch !== 'object') return;
+    setPomodoroConfig(prev => {
+      const nextRaw = { ...prev, ...patch };
+      const next = savePomodoroConfig(nextRaw);
+      setPomodoroState(current => {
+        if (!current) return current;
+
+        const phase = current.phase || 'work';
+        const currentDuration = phase === 'work'
+          ? (current.workDuration || prev.workDuration || DEFAULT_POMODORO_CONFIG.workDuration)
+          : phase === 'break'
+            ? (current.breakDuration || prev.breakDuration || DEFAULT_POMODORO_CONFIG.breakDuration)
+            : (current.longBreakDuration || prev.longBreakDuration || DEFAULT_POMODORO_CONFIG.longBreakDuration);
+        const nextDuration = phase === 'work'
+          ? next.workDuration
+          : phase === 'break'
+            ? next.breakDuration
+            : next.longBreakDuration;
+        const currentDurationSec = currentDuration * 60;
+        const nextDurationSec = nextDuration * 60;
+        const currentRemaining = Number(current.remaining || 0);
+        const elapsed = Math.max(0, currentDurationSec - currentRemaining);
+        const nextRemaining = Math.max(0, nextDurationSec - elapsed);
+        const adjustedStartedAt = new Date(Date.now() - elapsed * 1000).toISOString();
+
+        const updatedState = {
+          ...current,
+          workDuration: next.workDuration,
+          breakDuration: next.breakDuration,
+          longBreakDuration: next.longBreakDuration,
+          sessionsBeforeLongBreak: next.sessionsBeforeLongBreak,
+          startedAt: current.pausedAt ? current.startedAt : adjustedStartedAt,
+          remaining: current.pausedAt ? Math.min(currentRemaining, nextDurationSec) : nextRemaining,
+        };
+        savePomodoroState(updatedState);
+        return updatedState;
+      });
+      return next;
+    });
+  }, []);
+
+  const beginPomodoroSession = useCallback((activity, selectedWorkDuration) => {
+    if (!activity?.activityId) return;
+
+    const existingActivity = allActivities.find(a => a.id === activity.activityId);
+    const spentBefore = existingActivity?.spentMinutes || 0;
+    const workDuration = Number.isFinite(Number(selectedWorkDuration))
+      ? Number(selectedWorkDuration)
+      : (pomodoroConfig.workDuration || DEFAULT_POMODORO_CONFIG.workDuration);
+    const breakDuration = pomodoroConfig.breakDuration || DEFAULT_POMODORO_CONFIG.breakDuration;
+    const longBreakDuration = pomodoroConfig.longBreakDuration || DEFAULT_POMODORO_CONFIG.longBreakDuration;
+    const sessionsBeforeLongBreak = pomodoroConfig.sessionsBeforeLongBreak || DEFAULT_POMODORO_CONFIG.sessionsBeforeLongBreak;
+    const targetMinutes = getEstimatedTargetMinutes(activity.activityType);
+
+    const state = {
+      id: activity.activityId,
+      activityId: activity.activityId,
+      activityName: activity.activityName,
+      activityType: activity.activityType,
+      activityIcon: activity.activityIcon || '📌',
+      phase: 'work',
+      startedAt: new Date().toISOString(),
+      pausedAt: null,
+      remaining: workDuration * 60,
+      workDuration,
+      breakDuration,
+      longBreakDuration,
+      sessionsBeforeLongBreak,
+      totalSessions: 1,
+      targetMinutes,
+      spentBefore,
+    };
+
+    setPomodoroState(state);
+    savePomodoroState(state);
+  }, [allActivities, pomodoroConfig]);
+
+  const startPomodoroForActivity = useCallback((activityId, activityName, activityType, activityIcon) => {
+    const normalizedActivity = {
+      activityId,
+      activityName,
+      activityType,
+      activityIcon
+    };
+
+    const durationOptions = getPomodoroDurationOptions(activityType);
+    const maxOption = Math.max(...durationOptions);
+
+    if (maxOption > 20 && durationOptions.length > 1) {
+      setPomodoroStartSelector({
+        open: true,
+        activity: normalizedActivity,
+        options: durationOptions
+      });
+      return;
+    }
+
+    beginPomodoroSession(normalizedActivity, durationOptions[0] || 25);
+  }, [beginPomodoroSession]);
+
+  const handlePomodoroPause = useCallback((remaining) => {
+    setPomodoroState(prev => {
+      if (!prev) return null;
+      const updated = { ...prev, pausedAt: new Date().toISOString(), remaining };
+      savePomodoroState(updated);
+      return updated;
+    });
+  }, []);
+
+  const handlePomodoroResume = useCallback((remaining) => {
+    setPomodoroState(prev => {
+      if (!prev) return null;
+      const normalizedRemaining = Number.isFinite(Number(remaining))
+        ? Math.max(0, Number(remaining))
+        : (prev.remaining || 0);
+      const totalDurationSeconds = prev.phase === 'work'
+        ? (prev.workDuration || 25) * 60
+        : prev.phase === 'break'
+          ? (prev.breakDuration || 5) * 60
+          : (prev.longBreakDuration || DEFAULT_POMODORO_CONFIG.longBreakDuration) * 60;
+      const elapsedBeforeResume = Math.max(0, totalDurationSeconds - normalizedRemaining);
+      const resumedStartedAt = new Date(Date.now() - elapsedBeforeResume * 1000).toISOString();
+
+      const updated = {
+        ...prev,
+        startedAt: resumedStartedAt,
+        pausedAt: null,
+        remaining: normalizedRemaining,
+      };
+      savePomodoroState(updated);
+      return updated;
+    });
+  }, []);
+
+  const buildPausedPomodoroState = useCallback((state) => {
+    if (!state || state.pausedAt) return state;
+    const totalDurationSeconds = state.phase === 'work'
+      ? (state.workDuration || DEFAULT_POMODORO_CONFIG.workDuration) * 60
+      : state.phase === 'break'
+        ? (state.breakDuration || DEFAULT_POMODORO_CONFIG.breakDuration) * 60
+        : (state.longBreakDuration || DEFAULT_POMODORO_CONFIG.longBreakDuration) * 60;
+    const startedAtTime = new Date(state.startedAt || Date.now()).getTime();
+    const elapsed = Math.max(0, Math.floor((Date.now() - startedAtTime) / 1000));
+    const remaining = Math.max(0, totalDurationSeconds - elapsed);
+    return {
+      ...state,
+      pausedAt: new Date().toISOString(),
+      remaining,
+    };
+  }, []);
+
+  const handlePomodoroCompleteSession = useCallback(() => {
+    setPomodoroState(prev => {
+      if (!prev) return null;
+      const activityId = prev.activityId;
+      const workMinutes = prev.workDuration || 25;
+
+      setWeeksData(prevWeeks => {
+        const newWeeks = { ...prevWeeks };
+        for (const [weekKey, activities] of Object.entries(newWeeks)) {
+          const idx = activities.findIndex(a => a.id === activityId);
+          if (idx >= 0) {
+            const updated = [...activities];
+            updated[idx] = {
+              ...updated[idx],
+              spentMinutes: (updated[idx].spentMinutes || 0) + workMinutes,
+              pomodoroSessions: (updated[idx].pomodoroSessions || 0) + 1,
+            };
+            newWeeks[weekKey] = updated;
+            DS.updateWeekActivity(updated[idx].id, {
+              spent_minutes: updated[idx].spentMinutes,
+              pomodoro_sessions: updated[idx].pomodoroSessions,
+            }).catch(() => {});
+            DS.savePomodoroSession(normalizeUsername(user?.username), {
+              id: `pom_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+              week_activity_id: activityId,
+              activity_name: prev.activityName,
+              activity_type: prev.activityType,
+              duration_minutes: workMinutes,
+              phase: 'work',
+              completed_at: new Date().toISOString(),
+            }).catch(() => {});
+            break;
+          }
+        }
+        return newWeeks;
+      });
+
+      const totalSessions = (prev.totalSessions || 0) + 1;
+      const sessionsBeforeLongBreak = prev.sessionsBeforeLongBreak || pomodoroConfig.sessionsBeforeLongBreak || DEFAULT_POMODORO_CONFIG.sessionsBeforeLongBreak;
+      const isLongBreak = totalSessions % sessionsBeforeLongBreak === 0;
+      const longBreakDuration = prev.longBreakDuration || pomodoroConfig.longBreakDuration || DEFAULT_POMODORO_CONFIG.longBreakDuration;
+
+      const breakState = {
+        ...prev,
+        phase: isLongBreak ? 'long_break' : 'break',
+        startedAt: new Date().toISOString(),
+        pausedAt: null,
+        remaining: (isLongBreak ? longBreakDuration : prev.breakDuration || 5) * 60,
+        totalSessions,
+        sessionsBeforeLongBreak,
+        longBreakDuration,
+        spentBefore: (prev.spentBefore || 0) + workMinutes,
+      };
+      savePomodoroState(breakState);
+      return breakState;
+    });
+  }, [pomodoroConfig.longBreakDuration, pomodoroConfig.sessionsBeforeLongBreak, user?.username]);
+
+  const handlePomodoroSkip = useCallback(() => {
+    setPomodoroState(prev => {
+      if (!prev) return null;
+      const workState = {
+        ...prev,
+        phase: 'work',
+        startedAt: new Date().toISOString(),
+        pausedAt: null,
+        remaining: (prev.workDuration || 25) * 60,
+      };
+      savePomodoroState(workState);
+      return workState;
+    });
+  }, []);
+
+  const handlePomodoroCancel = useCallback(() => {
+    setPomodoroState(null);
+    clearPomodoroState();
+  }, []);
+
+  const handleClosePomodoroSelector = useCallback(() => {
+    setPomodoroStartSelector({
+      open: false,
+      activity: null,
+      options: []
+    });
+  }, []);
+
+  const handleChoosePomodoroDuration = useCallback((minutes) => {
+    const selectedMinutes = Number(minutes);
+    if (!pomodoroStartSelector.activity || !Number.isFinite(selectedMinutes)) {
+      handleClosePomodoroSelector();
+      return;
+    }
+    beginPomodoroSession(pomodoroStartSelector.activity, selectedMinutes);
+    handleClosePomodoroSelector();
+  }, [beginPomodoroSession, handleClosePomodoroSelector, pomodoroStartSelector.activity]);
+
+  useEffect(() => {
+    if (!pomodoroState || pomodoroState.pausedAt || typeof window === 'undefined') return undefined;
+
+    const handlePageHide = () => {
+      setPomodoroState(prev => {
+        const next = buildPausedPomodoroState(prev);
+        if (!next) return prev;
+        savePomodoroState(next);
+        return next;
+      });
+    };
+
+    const handleBeforeUnload = () => {
+      const latest = getPomodoroState() || pomodoroState;
+      const next = buildPausedPomodoroState(latest);
+      if (next) {
+        savePomodoroState(next);
+      }
+    };
+
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [buildPausedPomodoroState, pomodoroState]);
+
+  useEffect(() => {
+    if (!pomodoroStartSelector.open) return undefined;
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        handleClosePomodoroSelector();
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [pomodoroStartSelector.open, handleClosePomodoroSelector]);
 
   const realToday = startOfDay(new Date());
   const realWeekStart = format(startOfWeek(realToday, { weekStartsOn: 1 }), 'yyyy-MM-dd');
@@ -990,16 +1935,15 @@ export default function App() {
     ? ''
     : 'Estás viendo una semana distinta. Vuelve a la semana actual para ver actividades de hoy en el Kanban.';
 
-  const cloneWeeksData = (data) => JSON.parse(JSON.stringify(data || {}));
+  const cloneWeeksData = (data) => cloneJson(data || {}, {});
 
   const persistWeekActivities = async (weekKey, activities) => {
-    if (!weekKey || !user?.username) return;
+    if (!weekKey || !currentUserKey) return;
     try {
-      let week = await DS.getWeek(user.username, weekKey);
-      if (!week) week = await DS.getOrCreateWeek(user.username, weekKey, activePlanId);
-      for (const a of (activities || [])) {
-        await DS.updateWeekActivity(a.id, { ...a, week_id: week.id, semana: weekKey });
-      }
+      let week = await DS.getWeek(currentUserKey, weekKey);
+      if (!week) week = await DS.getOrCreateWeek(currentUserKey, weekKey, activePlanId);
+      const deduped = cleanDuplicatedActivities(activities || []);
+      await DS.replaceWeekActivities(week.id, deduped, weekKey);
     } catch {}
   };
 
@@ -1285,8 +2229,6 @@ export default function App() {
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isResourcesModalOpen, setIsResourcesModalOpen] = useState(false);
-  // eslint-disable-next-line
-  const [customActivities, setCustomActivities] = useState({});
   const [activeSidebarSection, setActiveSidebarSection] = useState('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -1332,8 +2274,8 @@ export default function App() {
 
   const handleSaveNotes = (dayKey, newNotes) => {
     setNotes(prevNotes => ({ ...prevNotes, [dayKey]: newNotes }));
-    if (user?.username && currentWeek) {
-      DS.getWeek(user.username, currentWeek).then(week => {
+    if (currentUserKey && currentWeek) {
+      DS.getWeek(currentUserKey, currentWeek).then(week => {
         if (week) DS.saveWeekNote(week.id, dayKey, newNotes).catch(() => {});
       });
     }
@@ -1421,6 +2363,7 @@ export default function App() {
 
   const handleOpenSettings = () => {
     setActiveSidebarSection('settings');
+    setSettingsSection('activities');
     setIsCalendarModalOpen(false);
     setShowFrequencyModal(false);
     setIsResourcesModalOpen(false);
@@ -2267,28 +3210,6 @@ export default function App() {
     }
   }, [activeSidebarSection, isTodoDetailModalOpen, isKanbanEditOpen]);
 
-  // eslint-disable-next-line
-  const updateCompletions = (date, activityId, completed) => {
-    setCompletions(prev => {
-      const dateStr = date.toISOString().split('T')[0];
-      const newCompletions = { ...prev };
-      if (!newCompletions[dateStr]) {
-        newCompletions[dateStr] = { completed: 0, total: 0 };
-      }
-      // Update the count based on completion status
-      const activityDate = format(date, 'yyyy-MM-dd');
-      if (!newCompletions[activityDate]) {
-        newCompletions[activityDate] = { completed: 0, total: 0 };
-      }
-      if (completed) {
-        newCompletions[activityDate].completed += 1;
-      } else {
-        newCompletions[activityDate].completed = Math.max(0, newCompletions[activityDate].completed - 1);
-      }
-      return newCompletions;
-    });
-  };
-
   useEffect(() => {
     const newCompletions = {};
 
@@ -2571,6 +3492,10 @@ export default function App() {
             onDeleteActivity={handleDeleteActivityFromPlan}
             onUpdateActivity={handleUpdateActivityInPlan}
             onCopyFromPlan={handleCopyFromPlan}
+            onImportPlan={handleImportPlanToActive}
+            onSavePlan={handleSavePlanToCloud}
+            getPlanSyncState={getPlanSyncState}
+            isSavingPlanId={isSavingPlanId}
           />
         ) : activeSidebarSection === 'todos' ? (
           <TodoListView
@@ -2604,6 +3529,7 @@ export default function App() {
             onSaveKanbanEdit={handleSaveKanbanEdit}
             onCloseKanbanEdit={handleCloseKanbanEdit}
             onDeleteKanbanTodo={handleDeleteKanbanTodo}
+            onStartPomodoro={startPomodoroForActivity}
             quote={'"La disciplina de hoy crea la libertad de tu semana."'}
           />
         ) : (
@@ -3146,6 +4072,10 @@ export default function App() {
         onUpdateActivity={handleUpdateActivity}
         onDeleteActivity={handleDeleteActivity}
         currentWeekActivities={currentWeekData}
+        httpLogs={httpLogs}
+        onClearHttpLogs={handleClearHttpLogEntries}
+        initialSection={settingsSection}
+        onSectionChange={setSettingsSection}
       />
 
       <ResourcesModal
@@ -3153,6 +4083,83 @@ export default function App() {
         onClose={handleCloseResources}
         activities={allActivities}
         onAddActivity={handleAddActivity}
+      />
+
+      {httpToasts.length > 0 && (
+        <div className="http-toast-stack" aria-live="polite" aria-label="Notificaciones de peticiones">
+          {httpToasts.map((toast) => (
+            <article key={toast.id} className={`http-toast-card is-${toast.type || 'info'}`}>
+              <header className="http-toast-header">
+                <strong>{toast.title}</strong>
+                <button
+                  type="button"
+                  className="http-toast-close"
+                  aria-label="Cerrar notificación"
+                  onClick={() => dismissToast(toast.id)}
+                >
+                  <FaTimes />
+                </button>
+              </header>
+              {toast.message ? (
+                <p className="http-toast-message">{toast.message}</p>
+              ) : null}
+              {toast.actionLabel && toast.action ? (
+                <button
+                  type="button"
+                  className="http-toast-action"
+                  onClick={() => {
+                    toast.action();
+                    dismissToast(toast.id);
+                  }}
+                >
+                  {toast.actionLabel}
+                </button>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      )}
+
+      {pomodoroStartSelector.open && (
+        <div className="quick-add-overlay pomodoro-start-overlay" onClick={handleClosePomodoroSelector}>
+          <div className="pomodoro-start-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="quick-add-header">
+              <h3>Iniciar Pomodoro</h3>
+              <button type="button" className="quick-add-close" onClick={handleClosePomodoroSelector}>
+                <FaTimes />
+              </button>
+            </div>
+            <p className="pomodoro-start-copy">
+              Selecciona duración para <strong>{pomodoroStartSelector.activity?.activityName}</strong>
+            </p>
+            <div className="pomodoro-start-options">
+              {pomodoroStartSelector.options.map((minutes) => (
+                <button
+                  key={`pomodoro-duration-${minutes}`}
+                  type="button"
+                  className="pomodoro-start-option"
+                  onClick={() => handleChoosePomodoroDuration(minutes)}
+                >
+                  {minutes} min
+                </button>
+              ))}
+            </div>
+            <p className="pomodoro-start-hint">
+              Regla aplicada por tipo de actividad. Descanso: {pomodoroConfig.breakDuration} min.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <PomodoroWidget
+        pomodoroState={pomodoroState}
+        pomodoroConfig={pomodoroConfig}
+        onUpdateConfig={handleUpdatePomodoroConfig}
+        onPause={handlePomodoroPause}
+        onResume={handlePomodoroResume}
+        onSkip={handlePomodoroSkip}
+        onCancel={handlePomodoroCancel}
+        onCompleteSession={handlePomodoroCompleteSession}
       />
     </div>
   );

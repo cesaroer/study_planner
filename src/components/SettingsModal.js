@@ -1,5 +1,14 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { FaTimes, FaPlus, FaSave, FaSmile, FaTrash, FaEdit } from 'react-icons/fa';
+import {
+  FaTimes,
+  FaPlus,
+  FaSave,
+  FaSmile,
+  FaTrash,
+  FaEdit,
+  FaClipboard,
+  FaCheckCircle
+} from 'react-icons/fa';
 import EmojiPicker from 'emoji-picker-react';
 import './SettingsModal.css';
 
@@ -65,7 +74,30 @@ const ACTIVITY_TYPES = [
 // eslint-disable-next-line
 const EMOJI_ICONS = ['📱', '💻', '🌐', '⚡', '🤖', '🔄', '☁️', '⚙️', '📚', '🔧', '📊', '🌱'];
 
-export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity, onUpdateActivity, onDeleteActivity, currentWeekActivities = [] }) {
+const LOG_SECTION = 'logs';
+const ACTIVITIES_SECTION = 'activities';
+
+const safeStringify = (value) => {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+};
+
+export default function SettingsModal({
+  isOpen,
+  onClose,
+  onLogout,
+  onAddActivity,
+  onUpdateActivity,
+  onDeleteActivity,
+  currentWeekActivities = [],
+  httpLogs = [],
+  onClearHttpLogs,
+  initialSection = ACTIVITIES_SECTION,
+  onSectionChange
+}) {
   const [isAddingActivity, setIsAddingActivity] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emojiPickerRef = useRef(null);
@@ -79,10 +111,32 @@ export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity
     icono: '📱',
     dias: []
   });
+  const [activeSection, setActiveSection] = useState(initialSection === LOG_SECTION ? LOG_SECTION : ACTIVITIES_SECTION);
+  const [selectedLogId, setSelectedLogId] = useState(null);
+  const [copiedLogId, setCopiedLogId] = useState(null);
   
   const activitiesByType = useMemo(() => {
     return groupActivitiesByType(currentWeekActivities);
   }, [currentWeekActivities]);
+
+  const selectedLog = useMemo(() => {
+    if (!selectedLogId) return httpLogs?.[0] || null;
+    return httpLogs.find(log => log.id === selectedLogId) || httpLogs?.[0] || null;
+  }, [httpLogs, selectedLogId]);
+
+  useEffect(() => {
+    setActiveSection(initialSection === LOG_SECTION ? LOG_SECTION : ACTIVITIES_SECTION);
+  }, [initialSection]);
+
+  useEffect(() => {
+    if (!selectedLogId && httpLogs.length > 0) {
+      setSelectedLogId(httpLogs[0].id);
+      return;
+    }
+    if (selectedLogId && !httpLogs.some(log => log.id === selectedLogId)) {
+      setSelectedLogId(httpLogs[0]?.id || null);
+    }
+  }, [httpLogs, selectedLogId]);
 
   // Cerrar el selector de emojis al hacer clic fuera
   useEffect(() => {
@@ -100,6 +154,11 @@ export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  const switchSection = (nextSection) => {
+    setActiveSection(nextSection);
+    onSectionChange?.(nextSection);
+  };
 
   const handleEmojiClick = (emojiData) => {
     setNewActivity(prev => ({
@@ -337,6 +396,110 @@ export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity
         </div>
         
         <div className="settings-content">
+          <div className="settings-section-tabs">
+            <button
+              type="button"
+              className={activeSection === ACTIVITIES_SECTION ? 'active' : ''}
+              onClick={() => switchSection(ACTIVITIES_SECTION)}
+            >
+              Actividades
+            </button>
+            <button
+              type="button"
+              className={activeSection === LOG_SECTION ? 'active' : ''}
+              onClick={() => switchSection(LOG_SECTION)}
+            >
+              Logs HTTP
+            </button>
+          </div>
+
+          {activeSection === LOG_SECTION ? (
+            <div className="settings-logs-view">
+              <div className="settings-logs-list">
+                <div className="settings-logs-header">
+                  <h3>Historial de peticiones</h3>
+                  <button type="button" className="settings-log-clear" onClick={onClearHttpLogs}>
+                    <FaTrash />
+                    Limpiar
+                  </button>
+                </div>
+                {httpLogs.length === 0 ? (
+                  <p className="settings-log-empty">Todavía no hay logs para este usuario.</p>
+                ) : (
+                  <ul>
+                    {httpLogs.map((log) => (
+                      <li key={log.id}>
+                        <button
+                          type="button"
+                          className={`settings-log-item ${selectedLog?.id === log.id ? 'active' : ''}`}
+                          onClick={() => setSelectedLogId(log.id)}
+                        >
+                          <span className={`settings-log-status ${log.ok ? 'ok' : 'error'}`}>
+                            {log.ok ? 'OK' : 'ERR'}
+                          </span>
+                          <span className="settings-log-main">
+                            {log.actionTitle || `${log.method} ${log.path}`}
+                          </span>
+                          <span className="settings-log-meta">
+                            {log.status || 0} · {new Date(log.timestamp).toLocaleTimeString('es-MX')}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="settings-logs-detail">
+                {selectedLog ? (
+                  <>
+                    <div className="settings-logs-detail-header">
+                      <h4>{selectedLog.actionTitle || `${selectedLog.method} ${selectedLog.path}`}</h4>
+                      <button
+                        type="button"
+                        className="settings-log-copy"
+                        onClick={async () => {
+                          const diagnostic = safeStringify(selectedLog);
+                          try {
+                            await navigator.clipboard.writeText(diagnostic);
+                            setCopiedLogId(selectedLog.id);
+                            setTimeout(() => setCopiedLogId(null), 1200);
+                          } catch {}
+                        }}
+                      >
+                        {copiedLogId === selectedLog.id ? <FaCheckCircle /> : <FaClipboard />}
+                        {copiedLogId === selectedLog.id ? 'Copiado' : 'Copiar diagnóstico'}
+                      </button>
+                    </div>
+
+                    <div className="settings-logs-kv">
+                      <p><strong>Método:</strong> {selectedLog.method}</p>
+                      <p><strong>Endpoint:</strong> {selectedLog.path}</p>
+                      <p><strong>Status:</strong> {selectedLog.status}</p>
+                      <p><strong>Duración:</strong> {selectedLog.durationMs}ms</p>
+                      <p><strong>RequestId:</strong> {selectedLog.requestId}</p>
+                      <p><strong>Fecha:</strong> {new Date(selectedLog.timestamp).toLocaleString('es-MX')}</p>
+                    </div>
+
+                    {selectedLog.error ? (
+                      <div className="settings-log-block is-error">
+                        <h5>Error</h5>
+                        <pre>{safeStringify(selectedLog.error)}</pre>
+                      </div>
+                    ) : null}
+
+                    <div className="settings-log-block">
+                      <h5>Payload resumido</h5>
+                      <pre>{safeStringify(selectedLog.payloadSummary)}</pre>
+                    </div>
+                  </>
+                ) : (
+                  <p className="settings-log-empty">Selecciona un log para ver el detalle técnico.</p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
           <div className="settings-actions">
             {!isAddingActivity ? (
               <button 
@@ -557,6 +720,8 @@ export default function SettingsModal({ isOpen, onClose, onLogout, onAddActivity
               </div>
             </div>
           ))}
+            </>
+          )}
         </div>
       </div>
     </div>

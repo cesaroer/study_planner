@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'studyplanner_offline';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 let dbPromise = null;
 
@@ -56,6 +56,11 @@ function getDB() {
         }
         if (!db.objectStoreNames.contains('sync_meta')) {
           db.createObjectStore('sync_meta', { keyPath: 'user_id' });
+        }
+        if (!db.objectStoreNames.contains('pomodoro_sessions')) {
+          const store = db.createObjectStore('pomodoro_sessions', { keyPath: 'id' });
+          store.createIndex('user_id', 'user_id');
+          store.createIndex('week_activity_id', 'week_activity_id');
         }
       },
     });
@@ -225,4 +230,13 @@ export async function cacheGlobalTodos(userId, todos) {
 export async function getCachedGlobalTodos(userId) {
   const db = await getDB();
   return db.getAllFromIndex('global_todos', 'user_id', userId);
+}
+
+export async function cachePomodoroSessions(userId, sessions) {
+  const db = await getDB();
+  const tx = db.transaction('pomodoro_sessions', 'readwrite');
+  for (const session of sessions) {
+    await tx.store.put({ ...session, user_id: userId });
+  }
+  await tx.done;
 }

@@ -15,15 +15,29 @@ const normalizeKeyPart = (value) => String(value || '')
 
 const buildPrimaryIdentifier = (activity) => {
   if (!activity || typeof activity !== 'object') return '';
+  const username = normalizeKeyPart(localStorage.getItem('lastLoggedUsername') || 'anon');
+  const type = normalizeKeyPart(activity.tipo);
+  const name = normalizeKeyPart(activity.actividad);
+  const day = normalizeKeyPart(activity.dia);
+  if (name && type) return `usr:${username}|activity:${name}|type:${type}`;
+  if (name && day) return `usr:${username}|activity:${name}|day:${day}`;
+  if (name) return `usr:${username}|activity:${name}`;
+  if (activity.id) return `usr:${username}|id:${String(activity.id)}`;
+  return '';
+};
+
+const buildLegacyIdentifierCandidates = (activity) => {
+  if (!activity || typeof activity !== 'object') return [];
   const week = String(activity.semana || '').trim();
   const day = normalizeKeyPart(activity.dia);
   const name = normalizeKeyPart(activity.actividad);
-
-  if (week && day && name) return `wk:${week}|day:${day}|activity:${name}`;
-  if (day && name) return `day:${day}|activity:${name}`;
-  if (name) return `activity:${name}`;
-  if (activity.id) return String(activity.id);
-  return '';
+  const type = normalizeKeyPart(activity.tipo);
+  const legacy = [];
+  if (week && day && name) legacy.push(`wk:${week}|day:${day}|activity:${name}`);
+  if (day && name) legacy.push(`day:${day}|activity:${name}`);
+  if (name) legacy.push(`activity:${name}`);
+  if (name && type) legacy.push(`activity:${name}|type:${type}`);
+  return legacy;
 };
 
 const normalizeTodoRecord = (todo) => {
@@ -89,8 +103,11 @@ const TodoListModal = ({ isOpen, onClose, activity }) => {
     const keys = new Set();
     if (primaryIdentifier) keys.add(primaryIdentifier);
     if (activity?.id) keys.add(String(activity.id));
+    buildLegacyIdentifierCandidates(activity).forEach(key => {
+      if (key) keys.add(key);
+    });
     return Array.from(keys);
-  }, [primaryIdentifier, activity?.id]);
+  }, [primaryIdentifier, activity]);
 
   const persistLegacyMirror = useCallback((nextTodos) => {
     if (!primaryIdentifier) return;

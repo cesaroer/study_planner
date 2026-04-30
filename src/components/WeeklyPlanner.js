@@ -1,11 +1,157 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { FaPlus, FaTrash, FaClipboardList, FaCopy, FaArrowLeft, FaCalendarAlt } from 'react-icons/fa';
+import {
+  FaPlus,
+  FaTrash,
+  FaClipboardList,
+  FaCopy,
+  FaArrowLeft,
+  FaCalendarAlt,
+  FaCloudUploadAlt,
+  FaFileImport,
+  FaExclamationTriangle,
+  FaCloud,
+  FaLaptop
+} from 'react-icons/fa';
 import PlannerCell from './PlannerCell';
 import PlannerAddModal from './PlannerAddModal';
 import './WeeklyPlanner.css';
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+const ACTIVITY_TYPES = [
+  'Algoritmos',
+  'Actividad Principal',
+  'Secundaria',
+  'Menor Prioridad',
+  'Conocimiento Pasivo'
+];
+const TYPE_ICON_MAP = {
+  'Algoritmos': '🧠',
+  'Actividad Principal': '📌',
+  'Secundaria': '🧩',
+  'Menor Prioridad': '🪶',
+  'Conocimiento Pasivo': '📘'
+};
+const IMPORT_EXAMPLE = `{
+  "name": "Plan Backend Intensivo",
+  "activities": {
+    "Lunes": [
+      { "actividad": "LeetCode - Python", "tipo": "Algoritmos", "icono": "🧠", "tags": ["Algoritmos"] },
+      { "actividad": "FastAPI", "tipo": "Secundaria", "icono": "⚡", "tags": ["Proyecto"] }
+    ],
+    "Martes": [],
+    "Miércoles": [],
+    "Jueves": [],
+    "Viernes": [],
+    "Sábado": [],
+    "Domingo": []
+  }
+}`;
+
+const DAY_ALIASES = {
+  LUNES: 'Lunes',
+  LUN: 'Lunes',
+  MARTES: 'Martes',
+  MAR: 'Martes',
+  MIERCOLES: 'Miércoles',
+  MIERCOLE: 'Miércoles',
+  MIE: 'Miércoles',
+  JUEVES: 'Jueves',
+  JUE: 'Jueves',
+  VIERNES: 'Viernes',
+  VIE: 'Viernes',
+  SABADO: 'Sábado',
+  SAB: 'Sábado',
+  DOMINGO: 'Domingo',
+  DOM: 'Domingo'
+};
+
+const normalizeDayKey = (value = '') => {
+  const key = String(value || '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+  return DAY_ALIASES[key] || null;
+};
+
+const normalizeImportedPayload = (payload) => {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return { ok: false, errors: ['El JSON debe ser un objeto.'] };
+  }
+
+  const source = payload.activities && typeof payload.activities === 'object'
+    ? payload.activities
+    : payload;
+  const normalized = DAYS.reduce((acc, day) => ({ ...acc, [day]: [] }), {});
+  const errors = [];
+
+  Object.entries(source).forEach(([rawDay, rawActivities]) => {
+    const day = normalizeDayKey(rawDay);
+    if (!day) return;
+    if (!Array.isArray(rawActivities)) {
+      errors.push(`"${day}" debe contener un arreglo de actividades.`);
+      return;
+    }
+
+    rawActivities.forEach((entry, index) => {
+      if (typeof entry === 'string') {
+        const text = entry.trim();
+        if (!text) return;
+        normalized[day].push({
+          actividad: text,
+          tipo: 'Secundaria',
+          icono: TYPE_ICON_MAP.Secundaria,
+          tags: []
+        });
+        return;
+      }
+
+      if (!entry || typeof entry !== 'object') {
+        errors.push(`"${day}" actividad #${index + 1} tiene formato inválido.`);
+        return;
+      }
+
+      const actividad = String(entry.actividad || '').trim();
+      if (!actividad) {
+        errors.push(`"${day}" actividad #${index + 1} requiere "actividad".`);
+        return;
+      }
+
+      const tipo = ACTIVITY_TYPES.includes(entry.tipo) ? entry.tipo : 'Secundaria';
+      const icono = String(entry.icono || '').trim() || TYPE_ICON_MAP[tipo] || '📝';
+      const tags = Array.isArray(entry.tags)
+        ? [...new Set(entry.tags.map((tag) => String(tag || '').trim()).filter(Boolean))]
+        : [];
+      const targetMinutes = Number.isFinite(Number(entry.targetMinutes))
+        ? Math.max(0, Number(entry.targetMinutes))
+        : 0;
+
+      normalized[day].push({
+        actividad,
+        tipo,
+        icono,
+        tags,
+        targetMinutes
+      });
+    });
+  });
+
+  const hasAny = DAYS.some((day) => normalized[day].length > 0);
+  if (!hasAny) {
+    errors.push('No se detectaron actividades válidas en el JSON.');
+  }
+
+  if (errors.length > 0) {
+    return { ok: false, errors };
+  }
+
+  return {
+    ok: true,
+    name: String(payload.name || '').trim(),
+    activitiesByDay: normalized
+  };
+};
 
 export default function WeeklyPlanner({
   plans,
@@ -18,6 +164,10 @@ export default function WeeklyPlanner({
   onDeleteActivity,
   onUpdateActivity,
   onCopyFromPlan,
+  onImportPlan,
+  onSavePlan,
+  getPlanSyncState,
+  isSavingPlanId = null
 }) {
   const [plannerView, setPlannerView] = useState('home');
   const [dragState, setDragState] = useState({ activityId: null, fromDay: null });
@@ -29,8 +179,16 @@ export default function WeeklyPlanner({
   const [showMovePicker, setShowMovePicker] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importPayload, setImportPayload] = useState(IMPORT_EXAMPLE);
+  const [applyToVisibleWeek, setApplyToVisibleWeek] = useState(false);
+  const [importErrors, setImportErrors] = useState([]);
+  const [isImporting, setIsImporting] = useState(false);
 
   const activePlan = plans.find(p => p.id === activePlanId) || null;
+  const activePlanSyncState = activePlan
+    ? (typeof getPlanSyncState === 'function' ? getPlanSyncState(activePlan.id) : 'default')
+    : 'default';
   const copyablePlans = plans.filter(p => p.id !== activePlanId);
   const defaultPlan = plans.find(p => p.id === 'plan_default');
   const allCopyable = defaultPlan && !copyablePlans.some(p => p.id === 'plan_default')
@@ -308,6 +466,61 @@ export default function WeeklyPlanner({
     setShowCopyPicker(false);
   };
 
+  const handleImportPlan = async () => {
+    const trimmed = importPayload.trim();
+    if (!trimmed) {
+      setImportErrors(['Pega un JSON antes de importar.']);
+      return;
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch (error) {
+      setImportErrors([`JSON inválido: ${error.message}`]);
+      return;
+    }
+
+    const normalized = normalizeImportedPayload(parsed);
+    if (!normalized.ok) {
+      setImportErrors(normalized.errors || ['No fue posible validar el JSON.']);
+      return;
+    }
+
+    if (!onImportPlan || !activePlanId) return;
+
+    setIsImporting(true);
+    setImportErrors([]);
+    try {
+      const imported = await onImportPlan(activePlanId, {
+        name: normalized.name,
+        activitiesByDay: normalized.activitiesByDay,
+        applyToVisibleWeek
+      });
+      if (imported !== false) {
+        setIsImportModalOpen(false);
+      }
+    } catch (error) {
+      setImportErrors([error?.message || 'No se pudo importar el plan.']);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const getPlanOriginBadge = (planId) => {
+    const state = typeof getPlanSyncState === 'function' ? getPlanSyncState(planId) : 'default';
+    if (state === 'cloud') {
+      return { icon: <FaCloud />, label: 'Nube', className: 'is-cloud' };
+    }
+    if (state === 'local') {
+      return { icon: <FaLaptop />, label: 'Local', className: 'is-local' };
+    }
+    if (state === 'error') {
+      return { icon: <FaExclamationTriangle />, label: 'Sync pendiente', className: 'is-error' };
+    }
+    return null;
+  };
+
   const getPlanActivityCount = (plan) => {
     return Object.values(plan.activities).reduce((sum, arr) => sum + (arr?.length || 0), 0);
   };
@@ -335,6 +548,7 @@ export default function WeeklyPlanner({
             <div className="planner-plans-grid">
               {plans.map(plan => {
                 const isActive = plan.id === activePlanId;
+                const originBadge = getPlanOriginBadge(plan.id);
                 return (
                   <div
                     key={plan.id}
@@ -353,6 +567,12 @@ export default function WeeklyPlanner({
                         {getPlanActivityCount(plan)} actividades
                       </span>
                     </div>
+                    {originBadge ? (
+                      <span className={`planner-plan-origin-badge ${originBadge.className}`} title={originBadge.label}>
+                        {originBadge.icon}
+                        <span>{originBadge.label}</span>
+                      </span>
+                    ) : null}
                     <button
                       className={`planner-plan-switch ${isActive ? 'on' : ''}`}
                       type="button"
@@ -396,19 +616,53 @@ export default function WeeklyPlanner({
             value={activePlan.name}
             onChange={(e) => onRenamePlan(activePlanId, e.target.value)}
           />
+          {activePlanSyncState !== 'default' && (
+            <span className={`planner-plan-sync-pill is-${activePlanSyncState}`}>
+              {activePlanSyncState === 'cloud' ? <FaCloud /> : activePlanSyncState === 'local' ? <FaLaptop /> : <FaExclamationTriangle />}
+              {activePlanSyncState === 'cloud' ? 'Nube' : activePlanSyncState === 'local' ? 'Local' : 'Error sync'}
+            </span>
+          )}
           {plans.length > 1 && (
             <select
               className="planner-plan-selector"
               value={activePlanId}
               onChange={(e) => onSetActivePlan(e.target.value)}
             >
-              {plans.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
+              {plans.map(p => {
+                const origin = getPlanOriginBadge(p.id);
+                const prefix = origin?.label === 'Nube'
+                  ? '☁ '
+                  : origin?.label === 'Local'
+                    ? '⌂ '
+                    : origin?.label === 'Sync pendiente'
+                      ? '⚠ '
+                      : '';
+                return (
+                  <option key={p.id} value={p.id}>{`${prefix}${p.name}`}</option>
+                );
+              })}
             </select>
           )}
         </div>
         <div className="planner-header-actions">
+          <button
+            className="planner-btn"
+            type="button"
+            onClick={() => {
+              setImportErrors([]);
+              setIsImportModalOpen(true);
+            }}
+          >
+            <FaFileImport /> Importar plan de estudios
+          </button>
+          <button
+            className="planner-btn primary"
+            type="button"
+            disabled={!activePlanId || isSavingPlanId === activePlanId}
+            onClick={() => onSavePlan?.(activePlanId)}
+          >
+            <FaCloudUploadAlt /> {isSavingPlanId === activePlanId ? 'Guardando...' : 'Guardar'}
+          </button>
           <button className="planner-btn" type="button" onClick={handleCreatePlan}>
             <FaPlus /> Nuevo
           </button>
@@ -569,6 +823,84 @@ export default function WeeklyPlanner({
           }}
           onSave={handleSaveEdit}
         />
+      )}
+
+      {isImportModalOpen && (
+        <div className="planner-import-overlay" onClick={() => setIsImportModalOpen(false)}>
+          <section className="planner-import-modal" onClick={(event) => event.stopPropagation()}>
+            <header className="planner-import-header">
+              <h3>Importar plan de estudios (JSON)</h3>
+              <button
+                type="button"
+                className="planner-back-btn"
+                onClick={() => setIsImportModalOpen(false)}
+                aria-label="Cerrar importación"
+              >
+                ✕
+              </button>
+            </header>
+
+            <div className="planner-import-grid">
+              <aside className="planner-import-help">
+                <h4>Formato esperado</h4>
+                <ul>
+                  <li>JSON objeto con `activities`.</li>
+                  <li>Días válidos: Lunes a Domingo.</li>
+                  <li>Cada actividad requiere `actividad`.</li>
+                  <li>`tipo`, `icono`, `tags` y `targetMinutes` son opcionales.</li>
+                </ul>
+                <p>
+                  Al importar, se reemplaza el plan activo local. Si marcas la opción de abajo,
+                  también se aplicará al dashboard de la semana visible.
+                </p>
+                <label className="planner-import-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={applyToVisibleWeek}
+                    onChange={(event) => setApplyToVisibleWeek(event.target.checked)}
+                  />
+                  <span>Aplicar también a la semana visible</span>
+                </label>
+              </aside>
+
+              <div className="planner-import-editor">
+                <label htmlFor="planner-import-json">Pega tu JSON</label>
+                <textarea
+                  id="planner-import-json"
+                  value={importPayload}
+                  onChange={(event) => setImportPayload(event.target.value)}
+                  spellCheck="false"
+                />
+                {importErrors.length > 0 && (
+                  <div className="planner-import-errors">
+                    {importErrors.map((error, index) => (
+                      <p key={`${error}-${index}`}>{error}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <aside className="planner-import-example">
+                <h4>Ejemplo</h4>
+                <pre>{IMPORT_EXAMPLE}</pre>
+              </aside>
+            </div>
+
+            <footer className="planner-import-actions">
+              <button type="button" className="planner-btn" onClick={() => setIsImportModalOpen(false)}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="planner-btn primary"
+                disabled={isImporting}
+                onClick={handleImportPlan}
+              >
+                {isImporting ? 'Importando...' : 'Importar y aplicar'}
+              </button>
+            </footer>
+          </section>
+        </div>
       )}
     </div>
   );

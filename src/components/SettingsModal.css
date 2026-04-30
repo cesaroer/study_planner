@@ -407,6 +407,219 @@
   accent-color: #fff;
 }
 
+.settings-section-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke-soft);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 4px;
+}
+
+.settings-section-tabs button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-low);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border-radius: 999px;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: all var(--ease-standard);
+}
+
+.settings-section-tabs button.active {
+  background: rgba(255, 255, 255, 0.9);
+  color: #0a0a0a;
+}
+
+.settings-logs-view {
+  min-height: 360px;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.5fr);
+  gap: 10px;
+}
+
+.settings-logs-list,
+.settings-logs-detail {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 10px;
+  min-height: 0;
+}
+
+.settings-logs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.settings-logs-header h3 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-hi);
+}
+
+.settings-log-clear,
+.settings-log-copy {
+  appearance: none;
+  border: 1px solid var(--stroke-soft);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-mid);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-log-clear:hover,
+.settings-log-copy:hover {
+  color: var(--text-hi);
+  border-color: var(--stroke-strong);
+}
+
+.settings-logs-list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.settings-log-item {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-mid);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.settings-log-item.active,
+.settings-log-item:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.settings-log-status {
+  width: 34px;
+  text-align: center;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 4px 0;
+}
+
+.settings-log-status.ok {
+  color: #cbf7dd;
+  background: rgba(61, 166, 109, 0.22);
+}
+
+.settings-log-status.error {
+  color: #ffcccc;
+  background: rgba(255, 95, 95, 0.24);
+}
+
+.settings-log-main {
+  font-size: 12px;
+  color: var(--text-hi);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.settings-log-meta {
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.settings-logs-detail {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.settings-logs-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-logs-detail-header h4 {
+  margin: 0;
+  color: var(--text-hi);
+  font-size: 14px;
+}
+
+.settings-logs-kv {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-logs-kv p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-mid);
+}
+
+.settings-log-block {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.22);
+  padding: 8px;
+}
+
+.settings-log-block.is-error {
+  border-color: rgba(255, 112, 112, 0.35);
+  background: rgba(255, 70, 70, 0.13);
+}
+
+.settings-log-block h5 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-low);
+}
+
+.settings-log-block pre {
+  margin: 0;
+  max-height: 180px;
+  overflow: auto;
+  color: var(--text-mid);
+  font-size: 11px;
+  line-height: 1.4;
+  font-family: 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+.settings-log-empty {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
 @media (max-width: 760px) {
   .settings-modal {
     max-height: calc(100vh - 68px);
@@ -419,5 +632,14 @@
 
   .emoji-picker-container {
     width: 100%;
+  }
+
+  .settings-logs-view {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .settings-logs-list ul {
+    max-height: 170px;
   }
 }

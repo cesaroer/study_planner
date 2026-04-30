@@ -70,7 +70,8 @@ function TodoListView({
   onKanbanEditTagsChange,
   onSaveKanbanEdit,
   onCloseKanbanEdit,
-  onDeleteKanbanTodo
+  onDeleteKanbanTodo,
+  onStartPomodoro
 }) {
   const [draggedCard, setDraggedCard] = useState(null);
   const [dropHint, setDropHint] = useState(EMPTY_DROP_HINT);
@@ -118,7 +119,8 @@ function TodoListView({
   useEffect(() => {
     if (!kanbanContextMenu.open) return undefined;
 
-    const onPointerDown = () => {
+    const onPointerDown = (event) => {
+      if (event.target?.closest('.todo-kanban-context-menu')) return;
       closeKanbanContextMenu();
     };
     const onEscape = (event) => {
@@ -276,7 +278,7 @@ function TodoListView({
         <div
           className="todo-kanban-context-menu"
           style={{ top: kanbanContextMenu.y, left: kanbanContextMenu.x }}
-          onMouseDown={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
           onContextMenu={(event) => event.preventDefault()}
         >
           <div className="todo-kanban-context-title">
@@ -287,6 +289,15 @@ function TodoListView({
           {isContextGlobalCard && (
             <button type="button" onClick={handleContextEdit}>
               Editar
+            </button>
+          )}
+
+          {contextMenuCard.source === 'activity' && contextMenuCard.status === 'todo' && (
+            <button type="button" className="is-pomodoro" onClick={() => {
+              onStartPomodoro?.(contextMenuCard.sourceId, contextMenuCard.text, contextMenuCard.activityType, contextMenuCard.icono);
+              closeKanbanContextMenu();
+            }}>
+              ▶ Iniciar Pomodoro
             </button>
           )}
 
