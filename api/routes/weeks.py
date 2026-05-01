@@ -45,6 +45,25 @@ async def get_weeks_range(from_: str = "", to: str = "", user: dict = Depends(ge
     return resp.data or []
 
 
+@router.post("")
+async def create_week(body: dict, user: dict = Depends(get_current_user)):
+    sb = get_supabase()
+    uid = user["user_id"]
+    week_start = body.get("week_start")
+    plan_id = body.get("plan_id")
+    if not week_start:
+        raise HTTPException(status_code=400, detail="week_start is required")
+    existing = sb_single(sb.table("weeks").select("id").eq("user_id", uid).eq("week_start", week_start))
+    if existing:
+        return existing
+    resp = sb.table("weeks").insert({
+        "user_id": uid,
+        "plan_id": plan_id,
+        "week_start": week_start,
+    }).execute()
+    return resp.data[0]
+
+
 @router.post("/deploy")
 async def deploy_week(body: dict, user: dict = Depends(get_current_user)):
     sb = get_supabase()
