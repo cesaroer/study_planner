@@ -26,6 +26,8 @@ import PomodoroWidget, {
 import WeeklyPlanner from './components/WeeklyPlanner';
 import * as DS from './services/dataService';
 import { api } from './services/api';
+import { pushPendingChanges, pullChanges } from './services/syncEngine';
+import { enqueueOperation } from './services/offlineQueue';
 import {
   setHttpLogUser,
   getHttpLogs,
@@ -341,6 +343,7 @@ export default function App() {
   // Hook para datos de usuario actual (clave depende del usuario)
   const [weeksData, setWeeksData] = useState({});
   const [areWeeksLoaded, setAreWeeksLoaded] = useState(false);
+  const [weekPlanIds, setWeekPlanIds] = useState({});
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -522,10 +525,12 @@ export default function App() {
         dbWeeks = await DS.getWeeksInRangeCaseInsensitive(currentUserKey, '2000-01-01', '2099-12-31');
       }
       const data = {};
+      const planIdMap = {};
       for (const w of dbWeeks) {
         const { all } = await DS.getWeekActivities(w.id);
         const deduped = cleanDuplicatedActivities(all);
         data[w.week_start] = deduped;
+        planIdMap[w.week_start] = w.plan_id || null;
         if (deduped.length !== all.length) {
           await DS.replaceWeekActivities(w.id, deduped, w.week_start);
         }
@@ -544,6 +549,7 @@ export default function App() {
         }
       }
       setWeeksData(data);
+      setWeekPlanIds(planIdMap);
       setAreWeeksLoaded(true);
     } catch (e) {
       console.error('Error loading weeks from IndexedDB:', e);
@@ -1000,6 +1006,13 @@ export default function App() {
       }
       return next;
     });
+    setWeekPlanIds(prev => {
+      const next = { ...prev };
+      for (const weekStart of Object.keys(newState)) {
+        next[weekStart] = planId;
+      }
+      return next;
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planSyncMeta, user, currentWeek, currentUserKey]);
 
@@ -1391,6 +1404,7 @@ export default function App() {
 
     localStorage.setItem('lastLoggedUsername', normalizedUsername);
     localStorage.setItem('hasHadUser', 'true');
+    localStorage.setItem('sync_user_id', normalizedUsername);
     setUser({ username: normalizedUsername });
     setLoginError('');
   };
@@ -1411,7 +1425,9 @@ export default function App() {
     if (!currentUserKey || !currentWeek) return;
     if (!areWeeksLoaded) return;
     if (initializeWeekRef.current) return;
-    if (weeksData[currentWeek] && weeksData[currentWeek].length > 0) return;
+    if (weeksData[currentWeek] && weeksData[currentWeek].length > 0) {
+      if (weekPlanIds[currentWeek] === activePlanId) return;
+    }
     if (!activePlanId || studyPlans.length === 0) return;
     initializeWeekRef.current = true;
 
@@ -1427,6 +1443,7 @@ export default function App() {
               await DS.replaceWeekActivities(week.id, deduped, currentWeek);
             }
             setWeeksData(prev => ({ ...prev, [currentWeek]: deduped }));
+            setWeekPlanIds(prev => ({ ...prev, [currentWeek]: activePlanId }));
             return;
           }
         }
@@ -1441,6 +1458,7 @@ export default function App() {
               await DS.replaceWeekActivities(deployedWeek.id, deduped, currentWeek);
             }
             setWeeksData(prev => ({ ...prev, [currentWeek]: deduped }));
+            setWeekPlanIds(prev => ({ ...prev, [currentWeek]: activePlanId }));
           }
         }
       } catch {
@@ -1450,7 +1468,7 @@ export default function App() {
     };
     initializeWeek();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentWeek, currentUserKey, studyPlans, activePlanId, areWeeksLoaded, weeksData]);
+  }, [currentWeek, currentUserKey, studyPlans, activePlanId, areWeeksLoaded, weeksData, weekPlanIds]);
 
   const currentWeekData = useMemo(
     () => (Array.isArray(weeksData[currentWeek]) ? weeksData[currentWeek] : []),
@@ -1957,8 +1975,36 @@ export default function App() {
       if (!week) week = await DS.getOrCreateWeek(currentUserKey, weekKey, activePlanId);
       const deduped = cleanDuplicatedActivities(activities || []);
       await DS.replaceWeekActivities(week.id, deduped, weekKey);
+      // Eager sync: enqueue each activity then push to cloud
+      for (const act of deduped) {
+        await enqueueOperation({
+          op_id: `${currentUserKey}-${act.id}-${act.updated_at}`,
+          table: 'week_activities',
+          operation: 'UPDATE',
+          record_id: act.id,
+          data: act,
+        });
+      }
+      pushPendingChanges(currentUserKey).catch(() => {});
     } catch {}
   };
+
+  // Periodic pull: every 30s fetch changes from cloud and reload current week state
+  useEffect(() => {
+    if (!currentUserKey || !currentWeek) return;
+    const syncAndReload = async () => {
+      try {
+        await pullChanges(currentUserKey);
+        const week = await DS.getWeek(currentUserKey, currentWeek);
+        if (week) {
+          const { all } = await DS.getWeekActivities(week.id);
+          setWeeksData(prev => ({ ...prev, [currentWeek]: cleanDuplicatedActivities(all) }));
+        }
+      } catch {}
+    };
+    const interval = setInterval(syncAndReload, 30000);
+    return () => clearInterval(interval);
+  }, [currentUserKey, currentWeek]);
 
   const setWeeksDataWithHistory = (updater) => {
     setWeeksData(prevWeeksData => {

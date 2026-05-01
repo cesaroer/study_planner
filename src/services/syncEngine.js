@@ -13,6 +13,7 @@ import {
   cacheGlobalTodos,
   cachePomodoroSessions,
 } from './offlineQueue';
+import { getWeek } from './dataService';
 
 let isSyncing = false;
 let listeners = [];
@@ -101,7 +102,16 @@ export async function pullChanges(userId) {
           break;
         case 'week_activities':
           if (change.operation !== 'DELETE' && change.record) {
-            await cacheWeekActivities(change.record.week_id, [change.record]);
+            const act = change.record;
+            // Remap week_id from the pushing browser's local ID to this browser's local ID
+            if (act.semana) {
+              const localWeek = await getWeek(userId, act.semana);
+              if (localWeek) {
+                await cacheWeekActivities(localWeek.id, [{ ...act, week_id: localWeek.id }]);
+              }
+            } else {
+              await cacheWeekActivities(act.week_id, [act]);
+            }
           }
           break;
         case 'week_notes':
