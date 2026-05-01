@@ -393,6 +393,12 @@ export async function moveWeekActivity(actId, targetDay) {
   return updateWeekActivity(actId, { dia: targetDay });
 }
 
+export async function getWeekActivityByPlanActivityId(weekId, planActivityId) {
+  const db = await getDB();
+  const all = await db.getAllFromIndex('week_activities', 'week_id', weekId);
+  return all.find(a => a.plan_activity_id === planActivityId) ?? null;
+}
+
 export async function checkAllDay(weekId, dia) {
   const db = await getDB();
   const all = await db.getAllFromIndex('week_activities', 'week_id', weekId);

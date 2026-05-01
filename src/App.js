@@ -1968,15 +1968,17 @@ export default function App() {
 
   const cloneWeeksData = (data) => cloneJson(data || {}, {});
 
-  const persistWeekActivities = async (weekKey, activities) => {
+  // syncActivities: optional subset to push (only changed ones). null = push all.
+  const persistWeekActivities = async (weekKey, activities, syncActivities = null) => {
     if (!weekKey || !currentUserKey) return;
     try {
       let week = await DS.getWeek(currentUserKey, weekKey);
       if (!week) week = await DS.getOrCreateWeek(currentUserKey, weekKey, activePlanId);
       const deduped = cleanDuplicatedActivities(activities || []);
       await DS.replaceWeekActivities(week.id, deduped, weekKey);
-      // Eager sync: enqueue each activity then push to cloud
-      for (const act of deduped) {
+      // Only enqueue the activities that actually changed to keep payloads minimal
+      const toSync = syncActivities ?? deduped;
+      for (const act of toSync) {
         await enqueueOperation({
           op_id: generateUUID(),
           table: 'week_activities',
@@ -1985,7 +1987,7 @@ export default function App() {
           data: act,
         });
       }
-      pushPendingChanges(currentUserKey).catch(() => {});
+      if (toSync.length > 0) pushPendingChanges(currentUserKey).catch(() => {});
     } catch {}
   };
 
@@ -2061,19 +2063,18 @@ export default function App() {
   const handleToggleActivity = (id) => {
     setWeeksDataWithHistory(prevWeeksData => {
       const weekActivities = Array.isArray(prevWeeksData[currentWeek]) ? prevWeeksData[currentWeek] : [];
-      const updatedActivities = weekActivities.map(act =>
-        act.id === id
-          ? (act.bloqueada ? act : normalizeActivity({ ...act, completado: !act.completado }))
-          : normalizeActivity(act)
-      );
+      let changedAct = null;
+      const updatedActivities = weekActivities.map(act => {
+        if (act.id === id) {
+          const updated = act.bloqueada ? act : normalizeActivity({ ...act, completado: !act.completado });
+          if (!act.bloqueada) changedAct = updated;
+          return updated;
+        }
+        return normalizeActivity(act);
+      });
 
-      const nextWeeksData = {
-        ...prevWeeksData,
-        [currentWeek]: updatedActivities,
-      };
-
-      persistWeekActivities(currentWeek, updatedActivities);
-      return nextWeeksData;
+      persistWeekActivities(currentWeek, updatedActivities, changedAct ? [changedAct] : []);
+      return { ...prevWeeksData, [currentWeek]: updatedActivities };
     });
   };
   
@@ -2343,36 +2344,34 @@ export default function App() {
   const handleCheckAll = (dayKey) => {
     setWeeksDataWithHistory(prevWeeksData => {
       const weekActivities = Array.isArray(prevWeeksData[currentWeek]) ? prevWeeksData[currentWeek] : [];
-      const updatedActivities = weekActivities.map(activity =>
-        activity.dia === dayKey && !activity.bloqueada
-          ? normalizeActivity({ ...activity, completado: true })
-          : normalizeActivity(activity)
-      );
-
-      const nextWeeksData = {
-        ...prevWeeksData,
-        [currentWeek]: updatedActivities
-      };
-      persistWeekActivities(currentWeek, updatedActivities);
-      return nextWeeksData;
+      const changed = [];
+      const updatedActivities = weekActivities.map(activity => {
+        if (activity.dia === dayKey && !activity.bloqueada) {
+          const updated = normalizeActivity({ ...activity, completado: true });
+          changed.push(updated);
+          return updated;
+        }
+        return normalizeActivity(activity);
+      });
+      persistWeekActivities(currentWeek, updatedActivities, changed);
+      return { ...prevWeeksData, [currentWeek]: updatedActivities };
     });
   };
 
   const handleUncheckAll = (dayKey) => {
     setWeeksDataWithHistory(prevWeeksData => {
       const weekActivities = Array.isArray(prevWeeksData[currentWeek]) ? prevWeeksData[currentWeek] : [];
-      const updatedActivities = weekActivities.map(activity =>
-        activity.dia === dayKey && !activity.bloqueada
-          ? normalizeActivity({ ...activity, completado: false })
-          : normalizeActivity(activity)
-      );
-
-      const nextWeeksData = {
-        ...prevWeeksData,
-        [currentWeek]: updatedActivities
-      };
-      persistWeekActivities(currentWeek, updatedActivities);
-      return nextWeeksData;
+      const changed = [];
+      const updatedActivities = weekActivities.map(activity => {
+        if (activity.dia === dayKey && !activity.bloqueada) {
+          const updated = normalizeActivity({ ...activity, completado: false });
+          changed.push(updated);
+          return updated;
+        }
+        return normalizeActivity(activity);
+      });
+      persistWeekActivities(currentWeek, updatedActivities, changed);
+      return { ...prevWeeksData, [currentWeek]: updatedActivities };
     });
   };
 
@@ -2982,30 +2981,24 @@ export default function App() {
     if (source === 'activity') {
       setWeeksDataWithHistory(prevWeeksData => {
         const weekActivities = Array.isArray(prevWeeksData[currentWeek]) ? prevWeeksData[currentWeek] : [];
-        let hasChanges = false;
+        let changedAct = null;
 
         const updatedActivities = weekActivities.map(activity => {
           if (activity.id !== sourceId || activity.bloqueada) {
             return normalizeActivity(activity);
           }
-
-          hasChanges = true;
-          return normalizeActivity({
+          changedAct = normalizeActivity({
             ...activity,
             kanbanStatus: targetStatus,
             completado: targetStatus === 'done'
           });
+          return changedAct;
         });
 
-        if (!hasChanges) return prevWeeksData;
+        if (!changedAct) return prevWeeksData;
 
-        const nextWeeksData = {
-          ...prevWeeksData,
-          [currentWeek]: updatedActivities
-        };
-
-        persistWeekActivities(currentWeek, updatedActivities);
-        return nextWeeksData;
+        persistWeekActivities(currentWeek, updatedActivities, [changedAct]);
+        return { ...prevWeeksData, [currentWeek]: updatedActivities };
       });
       return;
     }
