@@ -3,8 +3,8 @@
 }
 
 .settings-modal {
-  width: min(640px, 100%);
-  max-height: calc(100vh - 120px);
+  width: min(820px, 96vw);
+  max-height: calc(100vh - 40px);
   border-radius: 30px;
   border: 1px solid var(--stroke-soft);
   background: linear-gradient(180deg, rgba(22, 22, 22, 0.9), rgba(10, 10, 10, 0.92));
@@ -494,7 +494,7 @@
   list-style: none;
   display: grid;
   gap: 6px;
-  max-height: 320px;
+  max-height: 500px;
   overflow: auto;
 }
 
@@ -558,6 +558,8 @@
   display: grid;
   gap: 8px;
   align-content: start;
+  overflow-y: auto;
+  max-height: 520px;
 }
 
 .settings-logs-detail-header {
@@ -565,6 +567,13 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  position: sticky;
+  top: 0;
+  background: rgba(20, 20, 20, 0.92);
+  backdrop-filter: blur(4px);
+  z-index: 1;
+  padding-bottom: 6px;
+  margin-bottom: 2px;
 }
 
 .settings-logs-detail-header h4 {
@@ -606,7 +615,7 @@
 
 .settings-log-block pre {
   margin: 0;
-  max-height: 180px;
+  max-height: 400px;
   overflow: auto;
   color: var(--text-mid);
   font-size: 11px;
@@ -640,6 +649,6 @@
   }
 
   .settings-logs-list ul {
-    max-height: 170px;
+    max-height: 300px;
   }
 }

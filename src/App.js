@@ -962,8 +962,8 @@ export default function App() {
   useEffect(() => { loadPlansFromDB(); }, [loadPlansFromDB]);
 
   useEffect(() => {
-    if (!currentUserKey) return;
-    DS.setActivePlanId(currentUserKey, activePlanId || null).catch(() => {});
+    if (!currentUserKey || !activePlanId) return;
+    DS.setActivePlanId(currentUserKey, activePlanId).catch(() => {});
   }, [currentUserKey, activePlanId]);
 
   const handleSetActivePlan = useCallback(async (planId) => {
@@ -1978,7 +1978,7 @@ export default function App() {
       // Eager sync: enqueue each activity then push to cloud
       for (const act of deduped) {
         await enqueueOperation({
-          op_id: `${currentUserKey}-${act.id}-${act.updated_at}`,
+          op_id: generateUUID(),
           table: 'week_activities',
           operation: 'UPDATE',
           record_id: act.id,
