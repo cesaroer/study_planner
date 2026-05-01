@@ -6,10 +6,8 @@ import {
   getSyncMeta,
   setSyncMeta,
   enqueueOperation,
-  cachePlans,
   cacheWeekActivities,
   cacheWeekNotes,
-  cachePreferences,
   cacheGlobalTodos,
   cachePomodoroSessions,
 } from './offlineQueue';
