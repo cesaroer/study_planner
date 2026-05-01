@@ -12,7 +12,6 @@ import { getRealtimeClient, isRealtimeConfigured } from './supabaseClient';
 const CHANNEL_NAME = 'study-planner-sync';
 
 let supaChannel = null;
-let supaUserId = null;
 let bc = null;
 let bcListener = null;
 
@@ -44,7 +43,6 @@ export function startRealtimeSync(userId, onRemoteChange) {
     const client = getRealtimeClient();
     if (client) {
       try {
-        supaUserId = userId;
         supaChannel = client
           .channel(`sync-log-${userId}`)
           .on(
@@ -81,7 +79,6 @@ export function stopRealtimeSync() {
       if (client) client.removeChannel(supaChannel);
     } catch {}
     supaChannel = null;
-    supaUserId = null;
   }
   if (bc && bcListener) {
     try { bc.removeEventListener('message', bcListener); } catch {}
