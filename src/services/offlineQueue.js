@@ -189,7 +189,7 @@ export async function clearSyncedOperations() {
   const tx = db.transaction('sync_queue', 'readwrite');
   const all = await tx.store.getAll();
   for (const entry of all) {
-    if (entry.status === 'synced') {
+    if (entry.status === 'synced' || entry.status === 'failed') {
       await tx.store.delete(entry.id);
     }
   }
