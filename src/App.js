@@ -596,16 +596,26 @@ export default function App() {
 
   useEffect(() => { loadWeeksFromDB(); }, [loadWeeksFromDB]);
 
+  const ensureBackendWeek = useCallback(async () => {
+    const resp = await api.get(`/weeks?week_start=${currentWeek}`, { actionTitle: 'Buscando semana' });
+    if (resp?.week?.id) return resp.week.id;
+    const created = await api.post('/weeks', {
+      week_start: currentWeek,
+    }, { actionTitle: 'Creando semana en servidor' });
+    return created?.id || null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentWeek]);
+
   const handleSyncWeek = useCallback(async () => {
     if (!currentUserKey || !currentWeek || isSyncingWeek) return;
     setIsSyncingWeek(true);
     try {
-      const week = await DS.getWeek(currentUserKey, currentWeek);
-      if (!week) {
-        pushToast({ type: 'info', title: 'Sync', message: 'No hay datos locales para esta semana.' });
+      const backendWeekId = await ensureBackendWeek();
+      if (!backendWeekId) {
+        pushToast({ type: 'error', title: 'Sync', message: 'No se pudo obtener/crear la semana en el servidor.' });
         return;
       }
-      const backendActivities = await api.get(`/week_activities/${week.id}/activities`, { actionTitle: 'Sync semana' });
+      const backendActivities = await api.get(`/week_activities/${backendWeekId}/activities`, { actionTitle: 'Sync semana' });
       if (!Array.isArray(backendActivities) || backendActivities.length === 0) {
         pushToast({ type: 'info', title: 'Sync', message: 'No hay actividades en el servidor para esta semana.' });
         return;
@@ -624,7 +634,8 @@ export default function App() {
         pomodoroSessions: a.pomodoro_sessions,
         orden: a.orden,
       }));
-      await DS.replaceWeekActivities(week.id, normalized, currentWeek);
+      const localWeek = await DS.getWeek(currentUserKey, currentWeek);
+      if (localWeek) await DS.replaceWeekActivities(localWeek.id, normalized, currentWeek);
       setWeeksData(prev => ({ ...prev, [currentWeek]: normalized }));
       pushToast({ type: 'success', title: 'Sync completado', message: `${normalized.length} actividades sincronizadas.` });
     } catch (e) {
@@ -632,7 +643,7 @@ export default function App() {
     } finally {
       setIsSyncingWeek(false);
     }
-  }, [currentUserKey, currentWeek, isSyncingWeek, pushToast]);
+  }, [currentUserKey, currentWeek, isSyncingWeek, pushToast, ensureBackendWeek]);
 
   const handleSaveWeekToCloud = useCallback(async () => {
     if (!currentUserKey || !currentWeek || isSavingWeek) return;
@@ -643,13 +654,12 @@ export default function App() {
     }
     setIsSavingWeek(true);
     try {
-      const week = await DS.getWeek(currentUserKey, currentWeek);
-      if (!week) {
-        pushToast({ type: 'error', title: 'Guardar', message: 'No se encontró la semana local.' });
+      const backendWeekId = await ensureBackendWeek();
+      if (!backendWeekId) {
+        pushToast({ type: 'error', title: 'Guardar', message: 'No se pudo obtener/crear la semana en el servidor.' });
         return;
       }
-      const weekId = week.id;
-      const existing = await api.get(`/week_activities/${weekId}/activities`, { actionTitle: 'Consultando actividades' });
+      const existing = await api.get(`/week_activities/${backendWeekId}/activities`, { actionTitle: 'Consultando actividades' });
       const existingMap = new Map((existing || []).map(a => [a.id, a]));
       const localIds = new Set(weekActivities.map(a => a.id));
 
@@ -668,14 +678,14 @@ export default function App() {
           orden: act.orden || 0,
         };
         if (existingMap.has(act.id)) {
-          await api.put(`/week_activities/${weekId}/activities/${act.id}`, payload);
+          await api.put(`/week_activities/${backendWeekId}/activities/${act.id}`, payload);
         } else {
-          await api.post(`/week_activities/${weekId}/activities`, { ...payload, id: act.id });
+          await api.post(`/week_activities/${backendWeekId}/activities`, { ...payload, id: act.id });
         }
       }
       for (const remote of (existing || [])) {
         if (!localIds.has(remote.id)) {
-          await api.delete(`/week_activities/${weekId}/activities/${remote.id}`);
+          await api.delete(`/week_activities/${backendWeekId}/activities/${remote.id}`);
         }
       }
       pushToast({ type: 'success', title: 'Semana guardada', message: `${weekActivities.length} actividades subidas al servidor.` });
@@ -684,7 +694,7 @@ export default function App() {
     } finally {
       setIsSavingWeek(false);
     }
-  }, [currentUserKey, currentWeek, isSavingWeek, weeksData, pushToast]);
+  }, [currentUserKey, currentWeek, isSavingWeek, weeksData, pushToast, ensureBackendWeek]);
 
   useEffect(() => {
     if (!currentUserKey || !currentWeek) { setNotes({}); return; }
