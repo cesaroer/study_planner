@@ -1,5 +1,6 @@
 import logging
 import traceback
+import json
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -30,12 +31,56 @@ app.add_middleware(
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    tb = traceback.format_exc()
-    logger.error(f"Unhandled exception on {request.method} {request.url.path}:\n{tb}")
-    return JSONResponse(
-        status_code=500,
-        content={"detail": f"{type(exc).__name__}: {str(exc)}"},
+    tb_lines = traceback.format_exc().splitlines()
+    # Keep full traceback for logs, last 20 lines for response
+    tb_short = "\n".join(tb_lines[-20:]) if len(tb_lines) > 20 else "\n".join(tb_lines)
+
+    # Try to read request body (best effort, limited to 4 KB)
+    body_preview = None
+    try:
+        raw = await request.body()
+        if raw:
+            text = raw.decode("utf-8", errors="replace")[:4096]
+            try:
+                body_preview = json.loads(text)
+            except Exception:
+                body_preview = text
+    except Exception:
+        pass
+
+    # Extract Supabase / postgrest error details if present
+    supabase_detail = None
+    cause = getattr(exc, "__cause__", None) or getattr(exc, "__context__", None)
+    for candidate in (exc, cause):
+        if candidate is None:
+            continue
+        if hasattr(candidate, "json"):
+            try:
+                supabase_detail = candidate.json()
+            except Exception:
+                pass
+        if supabase_detail is None and hasattr(candidate, "args") and candidate.args:
+            arg = candidate.args[0]
+            if isinstance(arg, dict):
+                supabase_detail = arg
+
+    error_payload = {
+        "error": f"{type(exc).__name__}: {str(exc)}",
+        "endpoint": f"{request.method} {request.url.path}",
+        "traceback": tb_short,
+    }
+    if supabase_detail:
+        error_payload["supabase"] = supabase_detail
+    if body_preview is not None:
+        error_payload["request_body"] = body_preview
+
+    logger.error(
+        "Unhandled exception on %s %s\n%s",
+        request.method,
+        request.url.path,
+        "\n".join(tb_lines),
     )
+    return JSONResponse(status_code=500, content={"detail": error_payload})
 
 
 from api.routes import plans, plan_activities, weeks, week_activities

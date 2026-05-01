@@ -18,10 +18,12 @@ const parseJsonSafe = (rawValue, fallback) => {
   }
 };
 
-const sanitizePrimitive = (value) => {
+const sanitizePrimitive = (value, isErrorContext = false) => {
   if (typeof value !== 'string') return value;
   if (SENSITIVE_VALUE_PATTERN.test(value)) return '[REDACTED]';
-  if (value.length > 280) return `${value.slice(0, 280)}…`;
+  // Allow long strings in error context (tracebacks, etc.)
+  const limit = isErrorContext ? 8000 : 280;
+  if (value.length > limit) return `${value.slice(0, limit)}…`;
   return value;
 };
 
@@ -45,6 +47,21 @@ const redactSensitive = (value, keyHint = '') => {
   }
 
   return sanitizePrimitive(value);
+};
+
+// Like redactSensitive but with higher string limits for error/traceback fields
+const redactSensitiveError = (value) => {
+  if (value === null || value === undefined) return value;
+  if (Array.isArray(value)) return value.slice(0, 20).map((item) => redactSensitiveError(item));
+  if (typeof value === 'object') {
+    const out = {};
+    Object.entries(value).slice(0, 30).forEach(([key, item]) => {
+      if (SENSITIVE_KEY_PATTERN.test(String(key))) { out[key] = '[REDACTED]'; return; }
+      out[key] = redactSensitiveError(item);
+    });
+    return out;
+  }
+  return sanitizePrimitive(value, true);
 };
 
 const getStorageKey = (userKey) => `${HTTP_LOG_STORAGE_PREFIX}${normalizeUserKey(userKey)}`;
@@ -97,7 +114,7 @@ export const appendHttpLogEntry = (entry, userKey = resolveUserKey()) => {
     durationMs: Number.isFinite(Number(entry.durationMs)) ? Number(entry.durationMs) : 0,
     actionTitle: sanitizePrimitive(entry.actionTitle || ''),
     payloadSummary: redactSensitive(entry.payloadSummary || null),
-    error: redactSensitive(entry.error || null),
+    error: redactSensitiveError(entry.error || null),
   };
 
   const storageKey = getStorageKey(normalized);

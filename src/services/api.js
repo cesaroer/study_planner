@@ -49,9 +49,8 @@ async function request(method, path, body = null, meta = {}) {
     lastStatus = response.status;
     if (!response.ok) {
       const parsed = await parseJsonOrText(response);
-      const detail = typeof parsed === 'string'
-        ? parsed.slice(0, 260)
-        : parsed?.detail || response.statusText;
+      // detail may be a string, a structured object (from our global error handler), or undefined
+      const detail = typeof parsed === 'string' ? parsed : (parsed?.detail ?? response.statusText);
       appendHttpLogEntry({
         ...baseEntry,
         ok: false,
@@ -59,7 +58,11 @@ async function request(method, path, body = null, meta = {}) {
         durationMs: Date.now() - startedAt,
         error: detail,
       });
-      const responseError = new Error(detail || response.statusText);
+      // Build a readable Error message for throw (objects get stringified)
+      const errorMessage = typeof detail === 'object'
+        ? (detail?.error || JSON.stringify(detail))
+        : String(detail || response.statusText);
+      const responseError = new Error(errorMessage);
       responseError.__httpLogged = true;
       throw responseError;
     }
