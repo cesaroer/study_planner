@@ -350,6 +350,37 @@ select:focus-visible {
   letter-spacing: 0.01em;
 }
 
+.dashboard-sync-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke-soft);
+  background: var(--glass-2);
+  color: var(--text-hi);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.dashboard-sync-btn:hover:not(:disabled) {
+  background: var(--glass-3, rgba(255,255,255,0.08));
+  border-color: var(--accent, #6ea8ff);
+}
+.dashboard-sync-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.dashboard-sync-btn .is-spinning {
+  animation: dashboard-sync-spin 1s linear infinite;
+}
+@keyframes dashboard-sync-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .progress {
   margin-bottom: 24px;
   display: flex;

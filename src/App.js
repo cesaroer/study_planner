@@ -51,7 +51,8 @@ import {
   FaTimes,
   FaBars,
   FaSearch,
-  FaClipboardList
+  FaClipboardList,
+  FaSync
 } from 'react-icons/fa';
 
 // Utilidad simple para generar UUID v4
@@ -695,10 +696,47 @@ export default function App() {
     })();
   }, [currentUserKey]);
 
-  // Persistir global todos a IndexedDB
+  // Persistir global todos a IndexedDB y al cloud (real-time sync)
+  const lastSyncedTodosRef = useRef(null);
   useEffect(() => {
     if (!currentUserKey || !globalTodosReady) return;
     DS.saveGlobalTodos(currentUserKey, globalTodos).catch(() => {});
+
+    // Compute which todos actually changed since the last sync, only enqueue those
+    const prev = lastSyncedTodosRef.current;
+    if (prev !== null) {
+      const prevById = new Map(prev.map(t => [t.id, t]));
+      const currentIds = new Set(globalTodos.map(t => t.id));
+      const upserts = globalTodos.filter(t => {
+        const old = prevById.get(t.id);
+        if (!old) return true; // new
+        return JSON.stringify(old) !== JSON.stringify(t);
+      });
+      const deletes = prev.filter(t => !currentIds.has(t.id));
+
+      for (const todo of upserts) {
+        enqueueOperation({
+          op_id: generateUUID(),
+          table: 'global_todos',
+          operation: 'UPDATE',
+          record_id: todo.id,
+          data: { ...todo, user_id: currentUserKey },
+        }).catch(() => {});
+      }
+      for (const todo of deletes) {
+        enqueueOperation({
+          op_id: generateUUID(),
+          table: 'global_todos',
+          operation: 'DELETE',
+          record_id: todo.id,
+          data: { id: todo.id, user_id: currentUserKey },
+        }).catch(() => {});
+      }
+      if (upserts.length > 0 || deletes.length > 0) {
+        pushPendingChanges(currentUserKey).catch(() => {});
+      }
+    }
+    lastSyncedTodosRef.current = globalTodos;
   }, [globalTodos, currentUserKey, globalTodosReady]);
 
   // Rehidratar summary de activity todos cuando cambia foco de ventana o storage
@@ -1756,15 +1794,43 @@ export default function App() {
               spent_minutes: updated[idx].spentMinutes,
               pomodoro_sessions: updated[idx].pomodoroSessions,
             }).catch(() => {});
-            DS.savePomodoroSession(normalizeUsername(user?.username), {
-              id: `pom_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            // Real-time sync: push activity counters
+            const userKey = normalizeUsername(user?.username);
+            enqueueOperation({
+              op_id: generateUUID(),
+              table: 'week_activities',
+              operation: 'UPDATE',
+              record_id: updated[idx].id,
+              data: {
+                id: updated[idx].id,
+                plan_activity_id: updated[idx].plan_activity_id ?? null,
+                semana: updated[idx].semana || weekKey,
+                dia: updated[idx].dia,
+                spent_minutes: updated[idx].spentMinutes,
+                pomodoro_sessions: updated[idx].pomodoroSessions,
+                updated_at: new Date().toISOString(),
+              },
+            }).catch(() => {});
+            const sessionId = `pom_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            const sessionRecord = {
+              id: sessionId,
               week_activity_id: activityId,
               activity_name: prev.activityName,
               activity_type: prev.activityType,
               duration_minutes: workMinutes,
               phase: 'work',
               completed_at: new Date().toISOString(),
+            };
+            DS.savePomodoroSession(userKey, sessionRecord).catch(() => {});
+            // Real-time sync: push pomodoro session
+            enqueueOperation({
+              op_id: generateUUID(),
+              table: 'pomodoro_sessions',
+              operation: 'UPDATE',
+              record_id: sessionId,
+              data: { ...sessionRecord, user_id: userKey },
             }).catch(() => {});
+            pushPendingChanges(userKey).catch(() => {});
             break;
           }
         }
@@ -1989,6 +2055,29 @@ export default function App() {
 
   const cloneWeeksData = (data) => cloneJson(data || {}, {});
 
+  // Generic helper: enqueue an op and trigger an immediate push
+  const enqueueAndPush = useCallback(async (op) => {
+    if (!currentUserKey) return;
+    try {
+      await enqueueOperation({ op_id: generateUUID(), ...op });
+      pushPendingChanges(currentUserKey).catch(() => {});
+    } catch {}
+  }, [currentUserKey]);
+
+  // Slim payload for week_activity sync — receivers match by plan_activity_id
+  // and only merge mutable fields, so we don't need to ship the full activity.
+  const buildWeekActivitySyncPayload = (act) => ({
+    id: act.id,
+    plan_activity_id: act.plan_activity_id ?? null,
+    semana: act.semana || '',
+    dia: act.dia || '',
+    completado: Boolean(act.completado),
+    kanbanStatus: act.kanbanStatus || null,
+    spent_minutes: act.spent_minutes ?? act.spentMinutes ?? 0,
+    pomodoro_sessions: act.pomodoro_sessions ?? act.pomodoroSessions ?? 0,
+    updated_at: act.updated_at || new Date().toISOString(),
+  });
+
   // syncActivities: optional subset to push (only changed ones). null = push all.
   const persistWeekActivities = async (weekKey, activities, syncActivities = null) => {
     if (!weekKey || !currentUserKey) return;
@@ -2005,7 +2094,7 @@ export default function App() {
           table: 'week_activities',
           operation: 'UPDATE',
           record_id: act.id,
-          data: act,
+          data: buildWeekActivitySyncPayload(act),
         });
       }
       if (toSync.length > 0) pushPendingChanges(currentUserKey).catch(() => {});
@@ -2013,9 +2102,14 @@ export default function App() {
   };
 
   // Real-time sync: pull from cloud whenever another tab/device pushes a change.
-  // Falls back to a 30s polling safety net + a pull whenever the tab regains focus.
+  // Pulls immediately on mount, on tab focus, and on every remote event. Falls
+  // back to 30s polling as a last-resort safety net.
+  const syncAndReloadRef = useRef(() => {});
   useEffect(() => {
-    if (!currentUserKey || !currentWeek) return;
+    if (!currentUserKey || !currentWeek) {
+      syncAndReloadRef.current = () => {};
+      return;
+    }
 
     const syncAndReload = async () => {
       try {
@@ -2024,9 +2118,21 @@ export default function App() {
         if (week) {
           const { all } = await DS.getWeekActivities(week.id);
           setWeeksData(prev => ({ ...prev, [currentWeek]: cleanDuplicatedActivities(all) }));
+          // Refresh notes for the visible week
+          const notesMap = await DS.getWeekNotes(week.id);
+          if (notesMap) setNotes(prev => ({ ...prev, ...notesMap }));
+        }
+        // Refresh global todos
+        const dbTodos = await DS.getGlobalTodos(currentUserKey);
+        if (Array.isArray(dbTodos)) {
+          setGlobalTodos(dbTodos.map(normalizeGlobalTodo).filter(Boolean));
         }
       } catch {}
     };
+    syncAndReloadRef.current = syncAndReload;
+
+    // Pull immediately on mount/reload — no waiting 30s for stale data to refresh
+    syncAndReload();
 
     // Subscribe to instant remote events (Supabase Realtime + same-browser BroadcastChannel)
     startRealtimeSync(currentUserKey, () => { syncAndReload(); });
@@ -2117,6 +2223,22 @@ export default function App() {
     });
   };
   
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
+  const handleManualSync = useCallback(async () => {
+    if (!currentUserKey || isManualSyncing) return;
+    setIsManualSyncing(true);
+    try {
+      // Push any pending changes first, then pull the latest from cloud
+      await pushPendingChanges(currentUserKey);
+      await syncAndReloadRef.current();
+      pushToast({ type: 'success', title: 'Sincronizado', message: 'Datos actualizados desde la nube.', duration: 2500 });
+    } catch (err) {
+      pushToast({ type: 'error', title: 'Error de sincronización', message: err?.message || 'No se pudo sincronizar.', duration: 4000 });
+    } finally {
+      setIsManualSyncing(false);
+    }
+  }, [currentUserKey, isManualSyncing, pushToast]);
+
   const navigateWeek = (direction) => {
     const currentMonday = parseISO(currentWeek);
     const currentWeekStart = startOfDay(currentMonday);
@@ -2375,7 +2497,21 @@ export default function App() {
     setNotes(prevNotes => ({ ...prevNotes, [dayKey]: newNotes }));
     if (currentUserKey && currentWeek) {
       DS.getWeek(currentUserKey, currentWeek).then(week => {
-        if (week) DS.saveWeekNote(week.id, dayKey, newNotes).catch(() => {});
+        if (!week) return;
+        DS.saveWeekNote(week.id, dayKey, newNotes).catch(() => {});
+        // Real-time sync to cloud
+        enqueueAndPush({
+          table: 'week_notes',
+          operation: 'UPDATE',
+          record_id: `${week.id}::${dayKey}`,
+          data: {
+            week_id: week.id,
+            semana: currentWeek,
+            dia: dayKey,
+            content: newNotes,
+            updated_at: new Date().toISOString(),
+          },
+        });
       });
     }
   };
@@ -3637,6 +3773,16 @@ export default function App() {
         <div className="progress-summary">
           <p>{progressText}</p>
           <ProgressBar progress={progress} />
+          <button
+            type="button"
+            className="dashboard-sync-btn"
+            onClick={handleManualSync}
+            disabled={isManualSyncing || !currentUserKey}
+            title="Sincronizar con la nube ahora"
+          >
+            <FaSync className={isManualSyncing ? 'is-spinning' : ''} />
+            {isManualSyncing ? 'Sincronizando...' : 'Sincronizar'}
+          </button>
         </div>
 
         {focusMode ? (
