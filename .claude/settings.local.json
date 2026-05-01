@@ -13,7 +13,10 @@
       "Bash(git commit -m 'fix: replace all maybe_single\\(\\).execute\\(\\) with sb_single\\(\\) helper *)",
       "Bash(git commit -m 'fix: sync active plan to cloud when user changes it *)",
       "Bash(git commit -m 'fix: offer to redeploy current week when active plan changes *)",
-      "Bash(git commit -m 'audit fixes: remaining maybe_single, unsafe data access, dead code *)"
+      "Bash(git commit -m 'audit fixes: remaining maybe_single, unsafe data access, dead code *)",
+      "Bash(git commit -m 'fix: auto-redeploy current and future weeks when active plan changes *)",
+      "Bash(git commit -m 'Remove unused imports in syncEngine to fix CI build *)",
+      "Bash(npx react-scripts *)"
     ]
   }
 }

@@ -12,6 +12,7 @@ import {
   cachePomodoroSessions,
 } from './offlineQueue';
 import { getWeek, getWeekActivityByPlanActivityId } from './dataService';
+import { broadcastLocalPush } from './realtimeSync';
 
 let isSyncing = false;
 let listeners = [];
@@ -60,7 +61,11 @@ export async function pushPendingChanges(userId) {
     for (let i = 0; i < pending.length; i++) {
       const op = pending[i];
       const res = result.results?.[i];
-      if (res && (res.status === 'applied' || res.status === 'duplicate')) {
+      if (res && res.status === 'applied') {
+        await updateOperationStatus(op.id, 'synced');
+        // Notify other tabs in the same browser instantly
+        broadcastLocalPush(userId, op.table, op.record_id);
+      } else if (res && res.status === 'duplicate') {
         await updateOperationStatus(op.id, 'synced');
       } else {
         await updateOperationStatus(op.id, 'failed');

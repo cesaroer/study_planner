@@ -28,6 +28,7 @@ import * as DS from './services/dataService';
 import { api } from './services/api';
 import { pushPendingChanges, pullChanges } from './services/syncEngine';
 import { enqueueOperation } from './services/offlineQueue';
+import { startRealtimeSync, stopRealtimeSync } from './services/realtimeSync';
 import {
   setHttpLogUser,
   getHttpLogs,
@@ -2011,9 +2012,11 @@ export default function App() {
     } catch {}
   };
 
-  // Periodic pull: every 30s fetch changes from cloud and reload current week state
+  // Real-time sync: pull from cloud whenever another tab/device pushes a change.
+  // Falls back to a 30s polling safety net + a pull whenever the tab regains focus.
   useEffect(() => {
     if (!currentUserKey || !currentWeek) return;
+
     const syncAndReload = async () => {
       try {
         await pullChanges(currentUserKey);
@@ -2024,8 +2027,24 @@ export default function App() {
         }
       } catch {}
     };
+
+    // Subscribe to instant remote events (Supabase Realtime + same-browser BroadcastChannel)
+    startRealtimeSync(currentUserKey, () => { syncAndReload(); });
+
+    // Pull on visibility regain — covers cases where realtime disconnects
+    const onVisibility = () => { if (!document.hidden) syncAndReload(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onVisibility);
+
+    // Polling fallback (in case realtime is misconfigured or the connection drops)
     const interval = setInterval(syncAndReload, 30000);
-    return () => clearInterval(interval);
+
+    return () => {
+      stopRealtimeSync();
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onVisibility);
+      clearInterval(interval);
+    };
   }, [currentUserKey, currentWeek]);
 
   const setWeeksDataWithHistory = (updater) => {
