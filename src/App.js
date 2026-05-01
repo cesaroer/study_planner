@@ -132,8 +132,28 @@ const cleanDuplicatedActivities = (activities) => {
     }
   });
 
-  const bySignature = new Map();
+  // Dedupe by stable identity: (dia, plan_activity_id). Same plan activity in same
+  // day = same conceptual activity, even if local UUIDs differ across browsers.
+  // Keep the most recently updated copy (which carries the latest completado state).
+  const byPlanKey = new Map();
+  const noPlanKey = [];
   Array.from(byId.values()).forEach((activity) => {
+    const planActId = activity.plan_activity_id || activity.planActivityId;
+    if (!planActId) {
+      noPlanKey.push(activity);
+      return;
+    }
+    const key = `${activity.dia}::${planActId}`;
+    const existing = byPlanKey.get(key);
+    if (!existing || getActivityTimestamp(activity) >= getActivityTimestamp(existing)) {
+      byPlanKey.set(key, activity);
+    }
+  });
+
+  const dedupedByPlan = [...byPlanKey.values(), ...noPlanKey];
+
+  const bySignature = new Map();
+  dedupedByPlan.forEach((activity) => {
     const signature = buildExactActivitySignature(activity);
     const existing = bySignature.get(signature);
     if (!existing || getActivityTimestamp(activity) >= getActivityTimestamp(existing)) {
