@@ -1,51 +1,12 @@
 import uuid
 import re
-import os
-import time
 import logging
-import urllib.request
-import urllib.error
-import json
-import threading
 from fastapi import APIRouter, Depends, HTTPException
 from api.auth import get_current_user
 from api.database import get_supabase
 from api.utils import sb_single
 
 logger = logging.getLogger(__name__)
-
-WS_NOTIFY_URL = os.environ.get("WS_NOTIFY_URL", "")
-WS_NOTIFY_SECRET = os.environ.get("WS_NOTIFY_SECRET", "")
-
-
-def _notify_ws_relay(user_id: str, table: str, record_id: str, operation: str, revision: int) -> None:
-    """Fire-and-forget POST to the WS relay so connected clients get a real-time event.
-    Runs on a background thread so the request never blocks the user-facing response.
-    Uses urllib (stdlib) so we don't add an HTTP-client dependency."""
-    if not WS_NOTIFY_URL:
-        return
-
-    payload = json.dumps({
-        "user_id": user_id,
-        "table": table,
-        "record_id": record_id,
-        "operation": operation,
-        "revision": revision,
-        "ts": int(time.time()),
-    }).encode("utf-8")
-    headers = {"Content-Type": "application/json"}
-    if WS_NOTIFY_SECRET:
-        headers["X-Notify-Secret"] = WS_NOTIFY_SECRET
-
-    def _post():
-        try:
-            req = urllib.request.Request(WS_NOTIFY_URL, data=payload, headers=headers, method="POST")
-            with urllib.request.urlopen(req, timeout=2) as _:
-                pass
-        except Exception as exc:
-            logger.warning("ws notify failed: %s", exc)
-
-    threading.Thread(target=_post, daemon=True).start()
 
 _UUID_RE = re.compile(
     r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
@@ -172,10 +133,6 @@ async def push_changes(body: dict, user: dict = Depends(get_current_user)):
         # reading via REST API see consistent state
         if table_name == "week_activities" and data and change.get("operation") == "UPDATE":
             _apply_week_activity(sb, uid, data)
-
-        # Push a real-time event to other connected clients for this user
-        _notify_ws_relay(uid, table_name, change.get("record_id", ""),
-                         change.get("operation", "UPDATE"), current_revision)
 
         results.append({"op_id": op_id, "status": "applied", "revision": current_revision})
 
