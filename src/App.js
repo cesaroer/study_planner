@@ -596,15 +596,21 @@ export default function App() {
 
   useEffect(() => { loadWeeksFromDB(); }, [loadWeeksFromDB]);
 
-  const ensureBackendWeek = useCallback(async () => {
-    const resp = await api.get(`/weeks?week_start=${currentWeek}`, { actionTitle: 'Buscando semana' });
-    if (resp?.week?.id) return resp.week.id;
-    const created = await api.post('/weeks', {
-      week_start: currentWeek,
-    }, { actionTitle: 'Creando semana en servidor' });
-    return created?.id || null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentWeek]);
+const ensureBackendWeek = useCallback(async () => {
+    try {
+      const resp = await api.get(`/weeks?week_start=${currentWeek}`, { actionTitle: 'Buscando semana' });
+      if (resp?.week?.id) return resp.week.id;
+      const created = await api.post('/weeks', {
+        week_start: currentWeek,
+      }, { actionTitle: 'Creando semana en servidor' });
+      if (created?.id) return created.id;
+      pushToast({ type: 'error', title: 'Semana', message: `No se creó. Created response: ${JSON.stringify(created)}` });
+      return null;
+    } catch (e) {
+      pushToast({ type: 'error', title: 'Semana', message: `ensureBackendWeek falló: ${e?.message}` });
+      return null;
+    }
+  }, [currentWeek, pushToast]);
 
   const handleSyncWeek = useCallback(async () => {
     if (!currentUserKey || !currentWeek || isSyncingWeek) return;
@@ -659,7 +665,13 @@ export default function App() {
         pushToast({ type: 'error', title: 'Guardar', message: 'No se pudo obtener/crear la semana en el servidor.' });
         return;
       }
-      const existing = await api.get(`/week_activities/${backendWeekId}/activities`, { actionTitle: 'Consultando actividades' });
+      let existing = [];
+      try {
+        existing = await api.get(`/week_activities/${backendWeekId}/activities`, { actionTitle: 'Consultando actividades' });
+      } catch (e) {
+        pushToast({ type: 'error', title: 'Guardar', message: `No se pudo consultar actividades del servidor. Week ID: ${backendWeekId}. Error: ${e?.message}` });
+        return;
+      }
       const existingMap = new Map((existing || []).map(a => [a.id, a]));
       const localIds = new Set(weekActivities.map(a => a.id));
 
