@@ -25,8 +25,4 @@ if (!hasSupabaseConfig && typeof console !== 'undefined') {
   );
 }
 
-export const isRealtimeConfigured = hasSupabaseConfig;
-
-export const getRealtimeClient = () => (hasSupabaseConfig ? supabase : null);
-
 export default supabase;

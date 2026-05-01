@@ -1,18 +1,23 @@
 // Real-time sync layer.
-// - Supabase Realtime: subscribes to sync_log INSERTs filtered by user_id, so any
-//   change pushed from another browser/device triggers an immediate pullChanges.
+// - Plain WebSocket to a standalone relay (platform-independent, see ws_server/).
 // - BroadcastChannel: instant cross-tab notification within the same browser
 //   (no network needed). Fired right after a successful local push.
 //
-// Both fall back gracefully when not available — the existing periodic poll
-// continues to act as a safety net.
-
-import { getRealtimeClient, isRealtimeConfigured } from './supabaseClient';
+// Falls back gracefully when the WS URL is missing — the existing periodic
+// poll continues to act as a safety net.
 
 const CHANNEL_NAME = 'study-planner-sync';
+const WS_URL = (process.env.REACT_APP_WS_URL || '').replace(/\/+$/, '');
+const RECONNECT_INITIAL_MS = 1000;
+const RECONNECT_MAX_MS = 30000;
 
-let supaChannel = null;
-let supaUserId = null;
+let ws = null;
+let wsUserId = null;
+let wsCallback = null;
+let reconnectTimer = null;
+let reconnectDelay = RECONNECT_INITIAL_MS;
+let manualClose = false;
+
 let bc = null;
 let bcListener = null;
 
@@ -22,11 +27,50 @@ const getBroadcastChannel = () => {
   return bc;
 };
 
+function connectWebSocket() {
+  if (!WS_URL || !wsUserId || !wsCallback) return;
+  manualClose = false;
+  try {
+    const url = `${WS_URL}/ws/${encodeURIComponent(wsUserId)}`;
+    ws = new WebSocket(url);
+
+    ws.onopen = () => {
+      reconnectDelay = RECONNECT_INITIAL_MS;
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        wsCallback({ source: 'ws', ...data });
+      } catch {
+        wsCallback({ source: 'ws' });
+      }
+    };
+
+    ws.onerror = () => {
+      try { ws && ws.close(); } catch {}
+    };
+
+    ws.onclose = () => {
+      ws = null;
+      if (manualClose) return;
+      // Exponential backoff with cap
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(connectWebSocket, reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_MS);
+    };
+  } catch {
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(connectWebSocket, reconnectDelay);
+    reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_MS);
+  }
+}
+
 export function startRealtimeSync(userId, onRemoteChange) {
   stopRealtimeSync();
   if (!userId || typeof onRemoteChange !== 'function') return;
 
-  // Same-browser cross-tab sync
+  // Same-browser cross-tab sync (instant, no network)
   const channel = getBroadcastChannel();
   if (channel) {
     bcListener = (event) => {
@@ -39,50 +83,28 @@ export function startRealtimeSync(userId, onRemoteChange) {
     channel.addEventListener('message', bcListener);
   }
 
-  // Cross-device realtime via Supabase
-  if (isRealtimeConfigured) {
-    const client = getRealtimeClient();
-    if (client) {
-      try {
-        supaUserId = userId;
-        supaChannel = client
-          .channel(`sync-log-${userId}`)
-          .on(
-            'postgres_changes',
-            {
-              event: 'INSERT',
-              schema: 'public',
-              table: 'sync_log',
-              filter: `user_id=eq.${userId}`,
-            },
-            (payload) => {
-              const row = payload?.new;
-              if (!row) return;
-              onRemoteChange({
-                source: 'supabase',
-                table: row.table_name,
-                recordId: row.record_id,
-                revision: row.revision,
-              });
-            },
-          )
-          .subscribe();
-      } catch {
-        supaChannel = null;
-      }
-    }
+  // Cross-device realtime via WebSocket relay
+  if (WS_URL) {
+    wsUserId = userId;
+    wsCallback = onRemoteChange;
+    reconnectDelay = RECONNECT_INITIAL_MS;
+    connectWebSocket();
   }
 }
 
 export function stopRealtimeSync() {
-  if (supaChannel) {
-    try {
-      const client = getRealtimeClient();
-      if (client) client.removeChannel(supaChannel);
-    } catch {}
-    supaChannel = null;
-    supaUserId = null;
+  manualClose = true;
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
   }
+  if (ws) {
+    try { ws.close(); } catch {}
+    ws = null;
+  }
+  wsUserId = null;
+  wsCallback = null;
+
   if (bc && bcListener) {
     try { bc.removeEventListener('message', bcListener); } catch {}
     bcListener = null;

@@ -16,7 +16,9 @@
       "Bash(git commit -m 'audit fixes: remaining maybe_single, unsafe data access, dead code *)",
       "Bash(git commit -m 'fix: auto-redeploy current and future weeks when active plan changes *)",
       "Bash(git commit -m 'Remove unused imports in syncEngine to fix CI build *)",
-      "Bash(npx react-scripts *)"
+      "Bash(npx react-scripts *)",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\('main.py'\\).read\\(\\)\\); print\\('OK'\\)\")",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\('api/routes/sync.py'\\).read\\(\\)\\); print\\('OK'\\)\")"
     ]
   }
 }
