@@ -621,7 +621,7 @@ const ensureBackendWeek = useCallback(async () => {
         pushToast({ type: 'error', title: 'Sync', message: 'No se pudo obtener/crear la semana en el servidor.' });
         return;
       }
-      const backendActivities = await api.get(`/week_activities/${backendWeekId}/activities`, { actionTitle: 'Sync semana' });
+      const backendActivities = await api.get(`/weeks/${backendWeekId}/activities`, { actionTitle: 'Sync semana' });
       if (!Array.isArray(backendActivities) || backendActivities.length === 0) {
         pushToast({ type: 'info', title: 'Sync', message: 'No hay actividades en el servidor para esta semana.' });
         return;
@@ -667,7 +667,7 @@ const ensureBackendWeek = useCallback(async () => {
       }
       let existing = [];
       try {
-        existing = await api.get(`/week_activities/${backendWeekId}/activities`, { actionTitle: 'Consultando actividades' });
+        existing = await api.get(`/weeks/${backendWeekId}/activities`, { actionTitle: 'Consultando actividades' });
       } catch (e) {
         pushToast({ type: 'error', title: 'Guardar', message: `No se pudo consultar actividades del servidor. Week ID: ${backendWeekId}. Error: ${e?.message}` });
         return;
@@ -690,14 +690,14 @@ const ensureBackendWeek = useCallback(async () => {
           orden: act.orden || 0,
         };
         if (existingMap.has(act.id)) {
-          await api.put(`/week_activities/${backendWeekId}/activities/${act.id}`, payload);
+          await api.put(`/weeks/${backendWeekId}/activities/${act.id}`, payload);
         } else {
-          await api.post(`/week_activities/${backendWeekId}/activities`, { ...payload, id: act.id });
+          await api.post(`/weeks/${backendWeekId}/activities`, { ...payload, id: act.id });
         }
       }
       for (const remote of (existing || [])) {
         if (!localIds.has(remote.id)) {
-          await api.delete(`/week_activities/${backendWeekId}/activities/${remote.id}`);
+          await api.delete(`/weeks/${backendWeekId}/activities/${remote.id}`);
         }
       }
       pushToast({ type: 'success', title: 'Semana guardada', message: `${weekActivities.length} actividades subidas al servidor.` });
