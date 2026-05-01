@@ -11,7 +11,8 @@ import {
   cacheGlobalTodos,
   cachePomodoroSessions,
 } from './offlineQueue';
-import { getWeek } from './dataService';
+import { getWeek, getWeekActivityByPlanActivityId } from './dataService';
+import { broadcastLocalPush } from './realtimeSync';
 
 let isSyncing = false;
 let listeners = [];
@@ -60,7 +61,11 @@ export async function pushPendingChanges(userId) {
     for (let i = 0; i < pending.length; i++) {
       const op = pending[i];
       const res = result.results?.[i];
-      if (res && (res.status === 'applied' || res.status === 'duplicate')) {
+      if (res && res.status === 'applied') {
+        await updateOperationStatus(op.id, 'synced');
+        // Notify other tabs in the same browser instantly
+        broadcastLocalPush(userId, op.table, op.record_id);
+      } else if (res && res.status === 'duplicate') {
         await updateOperationStatus(op.id, 'synced');
       } else {
         await updateOperationStatus(op.id, 'failed');
@@ -101,11 +106,27 @@ export async function pullChanges(userId) {
         case 'week_activities':
           if (change.operation !== 'DELETE' && change.record) {
             const act = change.record;
-            // Remap week_id from the pushing browser's local ID to this browser's local ID
             if (act.semana) {
               const localWeek = await getWeek(userId, act.semana);
               if (localWeek) {
-                await cacheWeekActivities(localWeek.id, [{ ...act, week_id: localWeek.id }]);
+                if (act.plan_activity_id) {
+                  // Match by plan_activity_id so we update the local record in-place
+                  // rather than inserting a foreign-ID duplicate
+                  const localAct = await getWeekActivityByPlanActivityId(localWeek.id, act.plan_activity_id);
+                  if (localAct) {
+                    await cacheWeekActivities(localWeek.id, [{
+                      ...localAct,
+                      completado: act.completado,
+                      kanbanStatus: act.kanbanStatus ?? localAct.kanbanStatus,
+                      spent_minutes: act.spent_minutes ?? localAct.spent_minutes,
+                      pomodoro_sessions: act.pomodoro_sessions ?? localAct.pomodoro_sessions,
+                    }]);
+                  } else {
+                    await cacheWeekActivities(localWeek.id, [{ ...act, week_id: localWeek.id }]);
+                  }
+                } else {
+                  await cacheWeekActivities(localWeek.id, [{ ...act, week_id: localWeek.id }]);
+                }
               }
             } else {
               await cacheWeekActivities(act.week_id, [act]);
