@@ -348,6 +348,69 @@ select:focus-visible {
   font-weight: 600;
   color: var(--text-mid);
   letter-spacing: 0.01em;
+  flex: 1;
+}
+
+.week-sync-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.week-sync-btn,
+.week-save-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--stroke-soft);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-mid);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all var(--ease-standard);
+  white-space: nowrap;
+}
+
+.week-sync-btn:hover,
+.week-save-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-hi);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.week-sync-btn:disabled,
+.week-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.week-sync-btn svg,
+.week-save-btn svg {
+  font-size: 13px;
+}
+
+.week-save-btn {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #60a5fa;
+}
+
+.week-save-btn:hover {
+  background: rgba(59, 130, 246, 0.25);
+  color: #93bbfd;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
 }
 
 .progress {

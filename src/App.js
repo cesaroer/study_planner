@@ -51,7 +51,9 @@ import {
   FaTimes,
   FaBars,
   FaSearch,
-  FaClipboardList
+  FaClipboardList,
+  FaSyncAlt,
+  FaCloudUploadAlt
 } from 'react-icons/fa';
 
 // Utilidad simple para generar UUID v4
@@ -436,6 +438,8 @@ export default function App() {
   const [httpToasts, setHttpToasts] = useState([]);
   const [planSyncMeta, setPlanSyncMeta] = useState({});
   const [isSavingPlanId, setIsSavingPlanId] = useState(null);
+  const [isSyncingWeek, setIsSyncingWeek] = useState(false);
+  const [isSavingWeek, setIsSavingWeek] = useState(false);
   const [settingsSection, setSettingsSection] = useState('activities');
   useEffect(() => {
     if (user) { setIsAuthLoading(false); return; }
@@ -591,6 +595,96 @@ export default function App() {
   }, [currentUserKey]);
 
   useEffect(() => { loadWeeksFromDB(); }, [loadWeeksFromDB]);
+
+  const handleSyncWeek = useCallback(async () => {
+    if (!currentUserKey || !currentWeek || isSyncingWeek) return;
+    setIsSyncingWeek(true);
+    try {
+      const week = await DS.getWeek(currentUserKey, currentWeek);
+      if (!week) {
+        pushToast({ type: 'info', title: 'Sync', message: 'No hay datos locales para esta semana.' });
+        return;
+      }
+      const backendActivities = await api.get(`/week_activities/${week.id}/activities`, { actionTitle: 'Sync semana' });
+      if (!Array.isArray(backendActivities) || backendActivities.length === 0) {
+        pushToast({ type: 'info', title: 'Sync', message: 'No hay actividades en el servidor para esta semana.' });
+        return;
+      }
+      const normalized = backendActivities.map(a => normalizeActivity({
+        id: a.id,
+        dia: a.dia,
+        actividad: a.actividad,
+        tipo: a.tipo,
+        icono: a.icono,
+        completado: a.completado,
+        bloqueada: a.bloqueada,
+        tags: a.tags,
+        targetMinutes: a.target_minutes,
+        spentMinutes: a.spent_minutes,
+        pomodoroSessions: a.pomodoro_sessions,
+        orden: a.orden,
+      }));
+      await DS.replaceWeekActivities(week.id, normalized, currentWeek);
+      setWeeksData(prev => ({ ...prev, [currentWeek]: normalized }));
+      pushToast({ type: 'success', title: 'Sync completado', message: `${normalized.length} actividades sincronizadas.` });
+    } catch (e) {
+      pushToast({ type: 'error', title: 'Sync falló', message: e?.message || 'Error al sincronizar.' });
+    } finally {
+      setIsSyncingWeek(false);
+    }
+  }, [currentUserKey, currentWeek, isSyncingWeek, pushToast]);
+
+  const handleSaveWeekToCloud = useCallback(async () => {
+    if (!currentUserKey || !currentWeek || isSavingWeek) return;
+    const weekActivities = weeksData[currentWeek];
+    if (!Array.isArray(weekActivities) || weekActivities.length === 0) {
+      pushToast({ type: 'info', title: 'Guardar', message: 'No hay actividades locales para guardar.' });
+      return;
+    }
+    setIsSavingWeek(true);
+    try {
+      const week = await DS.getWeek(currentUserKey, currentWeek);
+      if (!week) {
+        pushToast({ type: 'error', title: 'Guardar', message: 'No se encontró la semana local.' });
+        return;
+      }
+      const weekId = week.id;
+      const existing = await api.get(`/week_activities/${weekId}/activities`, { actionTitle: 'Consultando actividades' });
+      const existingMap = new Map((existing || []).map(a => [a.id, a]));
+      const localIds = new Set(weekActivities.map(a => a.id));
+
+      for (const act of weekActivities) {
+        const payload = {
+          dia: act.dia,
+          actividad: act.actividad || '',
+          tipo: act.tipo || '',
+          icono: act.icono || '📝',
+          completado: Boolean(act.completado),
+          bloqueada: Boolean(act.bloqueada),
+          tags: Array.isArray(act.tags) ? act.tags : [],
+          target_minutes: act.targetMinutes || act.target_minutes || 0,
+          spent_minutes: act.spentMinutes || act.spent_minutes || 0,
+          pomodoro_sessions: act.pomodoroSessions || act.pomodoro_sessions || 0,
+          orden: act.orden || 0,
+        };
+        if (existingMap.has(act.id)) {
+          await api.put(`/week_activities/${weekId}/activities/${act.id}`, payload);
+        } else {
+          await api.post(`/week_activities/${weekId}/activities`, { ...payload, id: act.id });
+        }
+      }
+      for (const remote of (existing || [])) {
+        if (!localIds.has(remote.id)) {
+          await api.delete(`/week_activities/${weekId}/activities/${remote.id}`);
+        }
+      }
+      pushToast({ type: 'success', title: 'Semana guardada', message: `${weekActivities.length} actividades subidas al servidor.` });
+    } catch (e) {
+      pushToast({ type: 'error', title: 'Guardar falló', message: e?.message || 'Error al guardar.' });
+    } finally {
+      setIsSavingWeek(false);
+    }
+  }, [currentUserKey, currentWeek, isSavingWeek, weeksData, pushToast]);
 
   useEffect(() => {
     if (!currentUserKey || !currentWeek) { setNotes({}); return; }
@@ -3637,6 +3731,28 @@ export default function App() {
         <div className="progress-summary">
           <p>{progressText}</p>
           <ProgressBar progress={progress} />
+          <div className="week-sync-actions">
+            <button
+              type="button"
+              className="week-sync-btn"
+              onClick={handleSyncWeek}
+              disabled={isSyncingWeek}
+              title="Descargar actividades del servidor"
+            >
+              <FaSyncAlt className={isSyncingWeek ? 'spin' : ''} />
+              <span>{isSyncingWeek ? 'Sincronizando...' : 'Sync'}</span>
+            </button>
+            <button
+              type="button"
+              className="week-save-btn"
+              onClick={handleSaveWeekToCloud}
+              disabled={isSavingWeek}
+              title="Guardar semana en el servidor"
+            >
+              <FaCloudUploadAlt className={isSavingWeek ? 'spin' : ''} />
+              <span>{isSavingWeek ? 'Guardando...' : 'Guardar'}</span>
+            </button>
+          </div>
         </div>
 
         {focusMode ? (
